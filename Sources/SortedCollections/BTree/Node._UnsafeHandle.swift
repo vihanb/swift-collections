@@ -63,6 +63,7 @@ extension Node {
 extension Node._UnsafeHandle {
   /// Performs O(log n) search for a key, returning the first instance when duplicates exist. This
   /// returns the first possible insertion point for `key`.
+  @usableFromInline
   internal func firstIndex(of key: Key) -> Int {
     var start: Int = 0
     var end: Int = self.numElements
@@ -82,6 +83,7 @@ extension Node._UnsafeHandle {
   
   /// Performs O(log n) search for a key, returning the last instance when duplicates exist. This
   /// returns the last possible valid insertion point for `key`.
+  @usableFromInline
   internal func lastIndex(of key: Key) -> Int {
     var start: Int = 0
     var end: Int = self.numElements

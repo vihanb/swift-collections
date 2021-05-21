@@ -17,7 +17,7 @@ extension Node {
     capacity: Int
   ) where C.Element == Element {
     precondition(keyValuePairs.count <= capacity, "Too many key-value pairs.")
-    self.init(capacity: capacity)
+    self.init(withCapacity: capacity)
     self.count = keyValuePairs.count
     self.update { handle in
       let sortedKeyValuePairs = keyValuePairs.sorted(by: { $0.key < $1.key })

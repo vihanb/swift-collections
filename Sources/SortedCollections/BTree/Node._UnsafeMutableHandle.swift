@@ -69,14 +69,22 @@ extension Node {
   }
 }
 
+// MARK: Subscript
+extension Node._UnsafeHandle {
+  
+}
+
 // MARK: Node Mutations
 extension Node._UnsafeMutableHandle {
-  @usableFromInline
-  typealias Splinter = (median: Node.Element, rightChild: Node<Key, Value>)
-  
-//  @inlinable
-//  internal func insertValue(_ value: Value, forKey key: Key) -> Splinter {
-//    self.read.lastIndex(of: key)
-//  }
+  /// Inserts a value into this node or the appropriate child.
+  /// - Parameters:
+  ///   - value: The respect value to insert.
+  ///   - key: A key to insert. If this key exists it'll be inserted at last valid position.
+  /// - Returns: A splinter which can be used to construct the new upper and right children.
+  @inlinable
+  internal func insertValue(_ value: Value, forKey key: Key) -> Node._Splinter? {
+    self.read.lastIndex(of: key)
+    return nil
+  }
   
 }

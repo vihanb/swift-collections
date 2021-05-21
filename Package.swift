@@ -54,6 +54,7 @@ let package = Package(
     .library(name: "Collections", targets: ["Collections"]),
     .library(name: "DequeModule", targets: ["DequeModule"]),
     .library(name: "OrderedCollections", targets: ["OrderedCollections"]),
+    .library(name: "SortedCollections", targets: ["SortedCollections"])
   ],
   dependencies: [
     // This is only used in the benchmark executable target.
@@ -65,6 +66,7 @@ let package = Package(
       dependencies: [
         "DequeModule",
         "OrderedCollections",
+        "SortedCollections"
       ],
       path: "Sources/Collections",
       swiftSettings: settings),
@@ -123,6 +125,15 @@ let package = Package(
       name: "OrderedCollectionsTests",
       dependencies: ["OrderedCollections", "CollectionsTestSupport"],
       swiftSettings: settings),
+    
+    // SortedDictionary<Key, Value>
+    .target(
+      name: "SortedCollections",
+      swiftSettings: settings),
+    .testTarget(
+      name: "SortedCollectionsTests",
+      dependencies: ["SortedCollections", "CollectionsTestSupport"],
+      swiftSettings: settings)
   ],
   cxxLanguageStandard: .cxx1z
 )

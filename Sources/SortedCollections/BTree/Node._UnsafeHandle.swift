@@ -38,6 +38,24 @@ extension Node {
     @inlinable
     @inline(__always)
     internal var numChildren: Int { childrenHeader.pointee.count }
+    
+    @inlinable
+    @inline(__always)
+    internal init(
+      keyHeader: UnsafePointer<_BufferHeader>,
+      valueHeader: UnsafePointer<_BufferHeader>,
+      childrenHeader: UnsafePointer<_BufferHeader>,
+      keys: UnsafePointer<Key>,
+      values: UnsafePointer<Value>,
+      children: UnsafePointer<Node<Key, Value>>
+    ) {
+      self.keyHeader = keyHeader
+      self.valueHeader = valueHeader
+      self.childrenHeader = childrenHeader
+      self.keys = keys
+      self.values = values
+      self.children = children
+    }
   }
 }
 

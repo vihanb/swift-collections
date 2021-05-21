@@ -12,7 +12,8 @@
 extension Node {
   @usableFromInline
   internal struct _UnsafeMutableHandle {
-    private let read: _UnsafeHandle
+    @usableFromInline
+    internal let read: _UnsafeHandle
     
     // MARK: Mutable Properties
     @inlinable
@@ -73,9 +74,9 @@ extension Node._UnsafeMutableHandle {
   @usableFromInline
   typealias Splinter = (median: Node.Element, rightChild: Node<Key, Value>)
   
-  @inlinable
-  internal func insertValue(_ value: Value, forKey key: Key) -> Splinter {
-    self.read.lastIndex(of: key)
-  }
+//  @inlinable
+//  internal func insertValue(_ value: Value, forKey key: Key) -> Splinter {
+//    self.read.lastIndex(of: key)
+//  }
   
 }

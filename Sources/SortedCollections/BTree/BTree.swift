@@ -13,22 +13,24 @@
 let BTREE_NODE_CAPACITY = 100
 
 internal struct BTree<Key: Comparable, Value> {
-  /// The underlying node behind this local BTree
-  private var root: Node<Key, Value>
+  typealias Element = (key: Key, value: Value)
   
-  /// The total number of elements in every node in this BTree.
-  internal var count: Int
+  /// The underlying node behind this local BTree
+  internal var root: Node<Key, Value>
   
   internal init() {
     self.root = Node(withCapacity: BTREE_NODE_CAPACITY)
-    self.count = 0
+  }
+  
+  internal init(_rootedAt root: Node<Key, Value>) {
+    self.root = root
   }
   
   mutating func insertValue(_ value: Value, forKey key: Key) {
     root.update { handle in
-      if let splinter = handle.insertValue(value, forKey: key) {
-        self.root = root.
-      }
+//      if let splinter = handle.insertValue(value, forKey: key) {
+//        self.root = root
+//      }
     }
   }
 }

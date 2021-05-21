@@ -59,6 +59,25 @@ extension Node {
   }
 }
 
+// MARK: Subscript
+extension Node._UnsafeHandle {
+  @inlinable
+  @inline(__always)
+  internal subscript(elementAt index: Int) -> Node.Element {
+    assert(index < self.numElements, "Node element subscript out of bounds.")
+    let key = self.keys.advanced(by: index).pointee
+    let value = self.values.advanced(by: index).pointee
+    return (key: key, value: value)
+  }
+  
+  @inlinable
+  @inline(__always)
+  internal subscript(childAt index: Int) -> Node {
+    assert(index < self.numChildren, "Node child subscript out of bounds")
+    return self.children.advanced(by: index).pointee
+  }
+}
+
 // MARK: Binary Search
 extension Node._UnsafeHandle {
   /// Performs O(log n) search for a key, returning the first instance when duplicates exist. This

@@ -85,15 +85,15 @@ extension Node {
   @inline(__always)
   internal mutating func ensureUnique() {
     if !keys.isUniqueReference() {
-      self.keys = _Buffer<Key>.copy(from: keys, capacity: capacity)
+      self.keys = _Buffer<Key>.copy(from: keys, withCapacity: capacity)
     }
     
     if !values.isUniqueReference() {
-      self.values = _Buffer<Value>.copy(from: values, capacity: capacity)
+      self.values = _Buffer<Value>.copy(from: values, withCapacity: capacity)
     }
     
     if !children.isUniqueReference() {
-      self.children = _Buffer<Node<Key, Value>>.copy(from: children, capacity: capacity)
+      self.children = _Buffer<Node<Key, Value>>.copy(from: children, withCapacity: capacity)
     }
   }
   

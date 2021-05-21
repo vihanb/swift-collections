@@ -47,7 +47,7 @@ extension Node {
     }
     
     @inlinable
-    internal static func copy(from oldBuffer: Pointer, capacity: Int) -> Pointer {
+    internal static func copy(from oldBuffer: Pointer, withCapacity capacity: Int) -> Pointer {
       oldBuffer.withUnsafeMutablePointers { header, elements in
         let elementCount = header.pointee.count
         let buffer = Self.create(capacity: capacity, count: elementCount)

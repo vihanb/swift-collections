@@ -14,15 +14,18 @@ extension Node {
   @inline(never)
   public func _checkInvariants() {
     precondition(capacity > 0, "Capacity must be strictly positive.")
-    precondition(count <= capacity, "Overfilled node.")
-    precondition(keys.count == count, "Key count mismatch.")
-    precondition(values.count == count, "Value count mismatch.")
-    precondition(children.count <= count + 1 || children.count === 1, "Invalid children count for node.")
-    
-    // Validate the node is sorted
-    // TODO: is this too heavy to put in an invariant check?
-    for i in 0..<(count - 1) {
-      precondition(keys[i] <= keys[i + 1], "Node is out-of-order.")
+    self.read { handle in
+      let count = handle.numKeys
+      precondition(handle.numValues == count, "Value count mismatch.")
+      precondition(handle.numChildren <= count + 1 || handle.numChildren == 0, "Invalid children count for node.")
+      
+      // Validate the node is sorted
+      // TODO: is this too heavy to put in an invariant check?
+      if count > 1 {
+        for i in 0..<(count - 1) {
+          precondition(handle[keyAt: i] <= handle[keyAt: i + 1], "Node is out-of-order.")
+        }
+      }
     }
   }
   #else

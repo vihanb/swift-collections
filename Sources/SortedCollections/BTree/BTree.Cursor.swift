@@ -14,7 +14,8 @@ extension BTree {
   struct Cursor {
     @usableFromInline
     internal let root: Node<Key, Value>
-    
+  
+    // TODO: consider whether the entire path of nodes should be stored.
     @usableFromInline
     internal let node: Node<Key, Value>
     
@@ -26,6 +27,11 @@ extension BTree {
     @usableFromInline
     internal let path: [Int]
     
+    /// Creates a cursor from the BTree root to the element. This does not
+    /// perform any checks and assumes `node` is the correct node which
+    /// results from traversing to `path` from the `root`.
+    ///
+    /// - Complexity: O(`log n`) worst case.
     @inlinable
     @inline(__always)
     internal init(root: Node<Key, Value>, node: Node<Key, Value>, path: [Int]) {
@@ -34,6 +40,11 @@ extension BTree {
       self.path = path
     }
     
+    /// Initializes a cursor with the BTree root and the path to the element.
+    /// - Parameters:
+    ///   - root: The BTree root
+    ///   - path: Path from the root to the element
+    /// - Complexity: O(`log n`) worst-case.
     @inlinable
     @inline(__always)
     internal init(root: Node<Key, Value>, path: [Int]) {
@@ -49,47 +60,36 @@ extension BTree {
       self.node = node
     }
     
+    /// Constructs a cursor to the first element of a BTree. For an
+    /// empty BTree, this returns `nil` if the BTree is empty
+    /// - Parameter btree: the non-empty BTree
+    /// - Complexity: O(`log n`)
     @inlinable
-    internal init(firstElementOf btree: BTree) {
+    internal init?(firstElementOf btree: BTree) {
+      // Cannot create a cursor for an empty tree.
+      if btree.root.read({ $0.numKeys == 0 }) {
+        return nil
+      }
+      
       self.root = btree.root
       
-      var path = [Int]()
       var node = self.root
-      
+      var depth = 1
       while node.read({ $0.numChildren }) > 0 {
         node = node.read({ $0.children.pointee })
-        path.append(0)
+        depth += 1
       }
       
       self.node = node
-      self.path = path
+      self.path = [Int](repeating: 0, count: depth)
     }
     
     /// Attempts to return an advanced copy of the cursor
     @inlinable
     @inline(__always)
     internal func advanced() -> Cursor? {
-      // To go to the next element.
-      //
-      //      ┌───┬───┬───┐
-      //      │   │   │   │
-      //      │ 1 │ 2 │ 3 │
-      //      │   │   │   │
-      //      └───┴───┴───┘
-      //            ^--- N
-      //
-      // We check try visiting:
-      //   1. Child [N+1, 0]
-      //   2. Sibling [N+1, 0]
-      //   3. Set parent += 1 and retry
-      
-      var cursorToAdvance = self
-      
-      if let rightChild = cursor.rightChild {
-        return rightChild
-      }
-        
-      return self.parent
+      // Try visiting each of the nodes if the exist.
+      return self.rightChild ?? self.rightSibling ?? self.parent
     }
     
     // MARK: Tree-wise Cursor Movements
@@ -108,7 +108,7 @@ extension BTree {
     @inlinable
     @inline(__always)
     internal var rightSibling: Cursor? {
-      guard self.hasNextSibling else { return nil }
+      guard self.hasRightSibling else { return nil }
       var newPath = self.path
       newPath[newPath.count - 1] += 1
       return Cursor(root: root, node: node, path: newPath)
@@ -141,8 +141,8 @@ extension BTree {
     /// Checks if there is a sibling after the current cursor
     @inlinable
     @inline(__always)
-    internal var hasNextSibling: Bool {
-      self.node.read { self.elementIndex + 1 < $0.numChildren }
+    internal var hasRightSibling: Bool {
+      self.node.read { self.elementIndex + 1 < $0.numKeys }
     }
     
     /// Checks if there is a left-child

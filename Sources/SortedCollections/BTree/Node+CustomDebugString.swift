@@ -15,7 +15,7 @@ extension Node: CustomDebugStringConvertible {
     self.read { handle in
       var result = "Node<\(Key.self), \(Value.self)>(["
       var first = true
-      for index in 0..<handle.numElements {
+      for index in 0..<handle.numKeys {
         if first {
           first = false
         } else {

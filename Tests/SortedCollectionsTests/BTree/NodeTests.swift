@@ -15,11 +15,17 @@ import CollectionsTestSupport
 
 final class NodeTests: CollectionTestCase {
   func test_COW() {
+    #if COLLECTIONS_INTERNAL_CHECKS
+    expectEqual(1, 1)
+    #else
+    expectEqual(1, 0)
+    #endif
+    
     let nodeA = Node<Int, String>(_keyValuePairs: [], capacity: 5)
     let nodeB = nodeA
 //    _ = nodeB.insertValue("A", forKey: 1)
-    expectEqual(nodeA.count, 0)
-    expectEqual(nodeB.count, 1)
+//    expectEqual(nodeA.count, 0)
+//    expectEqual(nodeB.count, 1)
   }
 //
 //  func test_insertion() {
@@ -38,6 +44,21 @@ final class NodeTests: CollectionTestCase {
 //    _ = node.insertValue("D", forKey: 4)
 //    print(node)
 //  }
+  
+  func test_binarySearchMiddle() {
+    let node = Node<Int, String>(_keyValuePairs: [
+      (key: 0, value: "0"),
+      (key: 2, value: "1"),
+      (key: 4, value: "2"),
+      (key: 6, value: "3"),
+      (key: 8, value: "4"),
+    ], capacity: 100)
+    
+    node.read { handle in
+      expectEqual(handle.firstIndex(of: 3), 2)
+      expectEqual(handle.lastIndex(of: 3), 2)
+    }
+  }
   
   func test_binarySearchOdd() {
     let node = Node<Int, String>(_keyValuePairs: [

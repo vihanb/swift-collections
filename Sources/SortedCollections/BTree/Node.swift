@@ -15,17 +15,13 @@ internal struct Node<Key: Comparable, Value> {
   typealias Element = (key: Key, value: Value)
   
   @usableFromInline
-  internal var keys: _Buffer<Key>.Pointer
+  internal var keys: _Storage<Key>
   
   @usableFromInline
-  internal var values: _Buffer<Value>.Pointer
+  internal var values: _Storage<Value>
   
   @usableFromInline
-  internal var children: _Buffer<Node<Key, Value>>.Pointer
-  
-  /// The number of elements in this buffer
-  @usableFromInline
-  internal var count: Int
+  internal var children: _Storage<Node<Key, Value>>
   
   /// The total number of key-value pairs this node can store
   @usableFromInline
@@ -35,10 +31,9 @@ internal struct Node<Key: Comparable, Value> {
   @inlinable
   internal init(withCapacity capacity: Int) {
     assert(capacity > 0, "Capacity must be positive.")
-    self.keys = _Buffer<Key>.create(capacity: capacity)
-    self.values = _Buffer<Value>.create(capacity: capacity)
-    self.children = _Buffer<Node<Key, Value>>.create(capacity: capacity + 1)
-    self.count = 0
+    self.keys = _Storage(capacity: capacity)
+    self.values = _Storage(capacity: capacity)
+    self.children = _Storage(capacity: capacity + 1)
     self.capacity = capacity
   }
 }
@@ -52,16 +47,18 @@ extension Node {
   @inlinable
   @inline(__always)
   internal func read<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
-    try self.keys.withUnsafeMutablePointers { keyHeader, keys in
-      try self.values.withUnsafeMutablePointers { valueHeader, values in
-        try self.children.withUnsafeMutablePointers { childrenHeader, children in
+    try self.keys.buffer.withUnsafeMutablePointers { keyHeader, keys in
+      try self.values.buffer.withUnsafeMutablePointers { valueHeader, values in
+        try self.children.buffer.withUnsafeMutablePointers { childrenHeader, children in
           let handle = _UnsafeHandle(
             keyHeader: keyHeader,
             valueHeader: valueHeader,
             childrenHeader: childrenHeader,
             keys: keys,
             values: values,
-            children: children
+            children: children,
+            capacity: capacity,
+            isMutable: false
           )
           return try body(handle)
         }
@@ -74,9 +71,9 @@ extension Node {
   /// - Parameter body: A closure with a handle which allows interacting with the node
   @inlinable
   @inline(__always)
-  internal mutating func update<R>(_ body: (_UnsafeMutableHandle) throws -> R) rethrows -> R {
+  internal mutating func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
     self.ensureUnique()
-    return try self.read { try body(_UnsafeMutableHandle($0)) }
+    return try self.read { try body(_UnsafeHandle(mutableCopyOf: $0)) }
   }
   
   /// Ensure that this storage refers to a uniquely held buffer by copying
@@ -84,17 +81,9 @@ extension Node {
   @inlinable
   @inline(__always)
   internal mutating func ensureUnique() {
-    if !keys.isUniqueReference() {
-      self.keys = _Buffer<Key>.copy(from: keys, withCapacity: capacity)
-    }
-    
-    if !values.isUniqueReference() {
-      self.values = _Buffer<Value>.copy(from: values, withCapacity: capacity)
-    }
-    
-    if !children.isUniqueReference() {
-      self.children = _Buffer<Node<Key, Value>>.copy(from: children, withCapacity: capacity)
-    }
+    self.keys.ensureUnique(capacity: capacity)
+    self.values.ensureUnique(capacity: capacity)
+    self.children.ensureUnique(capacity: capacity + 1)
   }
   
 }

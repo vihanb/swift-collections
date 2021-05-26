@@ -69,3 +69,47 @@ extension Node._Storage {
     }
   }
 }
+
+// MARK: Sequence
+extension Node._Storage: Sequence {
+  @usableFromInline
+  internal struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal let storage: Node._Storage<Element>
+    
+    @usableFromInline
+    internal var index: Int
+    
+    @inlinable
+    @inline(__always)
+    internal init(storage: Node._Storage<Element>) {
+      self.storage = storage
+      self.index = 0
+    }
+    
+    @inlinable
+    @inline(__always)
+    internal mutating func next() -> Element? {
+      if self.index >= storage.buffer.header.count {
+        return nil
+      } else {
+        defer { self.index += 1 }
+        return storage.buffer.withUnsafeMutablePointerToElements { $0[self.index] }
+      }
+    }
+  }
+  
+  @inlinable
+  @inline(__always)
+  __consuming func makeIterator() -> Iterator {
+    return Iterator(storage: self)
+  }
+}
+
+// MARK: CustomDebugStringConvertible
+extension Node._Storage: CustomDebugStringConvertible {
+  /// A textual representation of this instance, suitable for debugging.
+  public var debugDescription: String {
+    Array(self).debugDescription
+  }
+}

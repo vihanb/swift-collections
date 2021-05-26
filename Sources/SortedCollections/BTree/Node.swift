@@ -57,7 +57,7 @@ extension Node {
             keys: keys,
             values: values,
             children: children,
-            capacity: capacity,
+            node: self,
             isMutable: false
           )
           return try body(handle)
@@ -71,9 +71,13 @@ extension Node {
   /// - Parameter body: A closure with a handle which allows interacting with the node
   @inlinable
   @inline(__always)
+  @discardableResult
   internal mutating func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
     self.ensureUnique()
-    return try self.read { try body(_UnsafeHandle(mutableCopyOf: $0)) }
+    return try self.read { handle in
+      defer { handle.checkInvariants() }
+      return try body(_UnsafeHandle(mutableCopyOf: handle))
+    }
   }
   
   /// Ensure that this storage refers to a uniquely held buffer by copying
@@ -85,5 +89,4 @@ extension Node {
     self.values.ensureUnique(capacity: capacity)
     self.children.ensureUnique(capacity: capacity + 1)
   }
-  
 }

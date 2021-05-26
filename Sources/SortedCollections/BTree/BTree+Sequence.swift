@@ -9,10 +9,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 extension BTree: Sequence {
+  @usableFromInline
   typealias Iterator = NodeIterator
   
+  @usableFromInline
   internal struct NodeIterator: IteratorProtocol {
+    @usableFromInline
     typealias Element = BTree.Element
     
     /// This is a path refering to child offsets
@@ -22,6 +26,7 @@ extension BTree: Sequence {
       self.currentCursor = Cursor(firstElementOf: btree)
     }
     
+    @usableFromInline
     mutating func next() -> Element? {
       guard let cursor = currentCursor else { return nil }
       defer { currentCursor = cursor.advanced() }

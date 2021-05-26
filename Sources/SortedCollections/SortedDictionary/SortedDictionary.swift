@@ -10,7 +10,9 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection which maintains key-value pairs in ascending sorted order.
-public class SortedDictionary<Key: Comparable, Value> {
+public struct SortedDictionary<Key: Comparable, Value> {
+  @usableFromInline
+  internal var root: BTree<Key, Value>
   
   /// Creates an empty dictionary.
   /// 
@@ -18,15 +20,16 @@ public class SortedDictionary<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   public init() {
-    
+    self.root = BTree()
   }
   
   /// Creates a dictionary from a sequence of key-value pairs which must
   /// be unique.
-  @inlinable
-  public init<S: Sequence>(
-    uniqueKeysWithValues keysAndValues: S
-  ) where S.Element == (Key, Value) {
-    
-  }
+//  @inlinable
+//  @inline(__always)
+//  public init<S>(
+//    uniqueKeysWithValues keysAndValues: S
+//  ) where S: Sequence, S.Element == (Key, Value) {
+//    self.root = BTree(sequence: keysAndValues)
+//  }
 }

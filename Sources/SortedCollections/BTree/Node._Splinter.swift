@@ -20,19 +20,27 @@ extension Node {
     // TODO: will swift optimize-away this property if unused?
     /// The left product of the node split.
     @usableFromInline
-    internal let leftChild: Node<Key, Value>
+    internal var leftChild: Node<Key, Value>
     
     /// The right product of the node split.
     @usableFromInline
-    internal let rightChild: Node<Key, Value>
+    internal var rightChild: Node<Key, Value>
     
     @inlinable
     @inline(__always)
-    internal func toNode(withCapacity capacity: Int) {
+    internal func toNode(withCapacity capacity: Int) -> Node {
       var node = Node(withCapacity: capacity)
       node.update { handle in
-//        handle.
+        handle.keys.initialize(to: median.key)
+        handle.values.initialize(to: median.value)
+        handle.numKeys = 1
+        handle.numValues = 1
+        
+        handle.children.initialize(to: self.leftChild)
+        handle.children.advanced(by: 1).initialize(to: self.rightChild)
+        handle.numChildren = 2
       }
+      return node
     }
   }
 }

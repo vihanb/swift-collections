@@ -31,6 +31,5 @@ extension Node {
       handle.numValues = keyValuePairs.count
       handle.numChildren = 0
     }
-    _checkInvariants()
   }
 }

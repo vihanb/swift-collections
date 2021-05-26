@@ -31,7 +31,7 @@ extension Node {
     internal let children: UnsafeMutablePointer<Node<Key, Value>>
     
     @usableFromInline
-    internal let capacity: Int
+    internal let node: Node
     
     @inlinable
     @inline(__always)
@@ -42,7 +42,7 @@ extension Node {
       keys: UnsafeMutablePointer<Key>,
       values: UnsafeMutablePointer<Value>,
       children: UnsafeMutablePointer<Node<Key, Value>>,
-      capacity: Int,
+      node: Node,
       isMutable: Bool
     ) {
       self.keyHeader = keyHeader
@@ -51,7 +51,7 @@ extension Node {
       self.keys = keys
       self.values = values
       self.children = children
-      self.capacity = capacity
+      self.node = node
       
       #if COLLECTIONS_INTERNAL_CHECKS
       self.isMutable = isMutable
@@ -77,6 +77,26 @@ extension Node {
       #endif
     }
     
+    // MARK: Invariant Checks
+    #if COLLECTIONS_INTERNAL_CHECKS
+    @inline(never)
+    @usableFromInline
+    internal func checkInvariants() {
+      assert(isLeaf || numChildren == numKeys + 1, "Node must have either zero children or a child on the side of each key.")
+      assert(numKeys == numKeys, "Node must have equal count of keys and values ")
+      
+      if numKeys > 1 {
+        for i in 0..<(numKeys - 1) {
+          precondition(self[keyAt: i] <= self[keyAt: i + 1], "Node is out-of-order.")
+        }
+      }
+    }
+    #else
+    @inlinable
+    @inline(__always)
+    internal func checkInvariants() {}
+    #endif // COLLECTIONS_INTERNAL_CHECKS
+    
     /// Creates a mutable version of this handle
     @inlinable
     @inline(__always)
@@ -88,7 +108,7 @@ extension Node {
         keys: handle.keys,
         values: handle.values,
         children: handle.children,
-        capacity: handle.capacity,
+        node: handle.node,
         isMutable: true
       )
     }
@@ -98,22 +118,26 @@ extension Node {
     @inline(__always)
     internal var numKeys: Int {
       get { keyHeader.pointee.count }
-      nonmutating set { keyHeader.pointee.count = newValue }
+      nonmutating set { assertMutable(); keyHeader.pointee.count = newValue }
     }
     
     @inlinable
     @inline(__always)
     internal var numValues: Int {
       get { valueHeader.pointee.count }
-      nonmutating set { valueHeader.pointee.count = newValue }
+      nonmutating set { assertMutable(); valueHeader.pointee.count = newValue }
     }
     
     @inlinable
     @inline(__always)
     internal var numChildren: Int {
       get { childrenHeader.pointee.count }
-      nonmutating set { childrenHeader.pointee.count = newValue }
+      nonmutating set { assertMutable(); childrenHeader.pointee.count = newValue }
     }
+    
+    @inlinable
+    @inline(__always)
+    internal var isLeaf: Bool { self.numChildren == 0 }
   }
 }
 
@@ -128,24 +152,13 @@ extension Node._UnsafeHandle {
     }
     
     nonmutating set(newElement) {
-      assert(index <= self.numKeys, "Node element subscript out of bounds.")
-      assert(index < self.capacity)
+      assertMutable()
+      assert(index < self.numKeys, "Node element subscript out of bounds.")
       
-      // The subscript for UnsafeMutablePointer will deinitialize the
-      // old value, so we'll take steps to not uninitialize the memory
-      // if we're not overwriting an existing spot in the
-      if index == self.numKeys {
-        self.keys.advanced(by: index).initialize(to: newElement.key)
-        self.values.advanced(by: index).initialize(to: newElement.value)
-        
-        self.numKeys += 1
-        self.numValues += 1
-      } else {
-        // TODO: ensure that the subscript does deintialize the old
-        // element
-        self.keys[index] = newElement.key
-        self.values[index] = newElement.value
-      }
+      // TODO: ensure that the subscript does deintialize the old
+      // element
+      self.keys[index] = newElement.key
+      self.values[index] = newElement.value
     }
   }
   
@@ -173,17 +186,9 @@ extension Node._UnsafeHandle {
     }
     
     nonmutating set(newChild) {
-      assert(index <= self.numChildren, "Node element subscript out of bounds.")
-      assert(index < self.capacity)
-      
-      // The subscript for UnsafeMutablePointer will deinitialize the
-      // old value, so we'll take steps to not uninitialize the memory
-      // if we're not overwriting an existing spot in the
-      if index == self.numChildren {
-        self.children.advanced(by: index).initialize(to: newChild)
-      } else {
-        self.children[index] = newChild
-      }
+      assertMutable()
+      assert(index < self.numChildren, "Node element subscript out of bounds.")
+      self.children[index] = newChild
     }
   }
 }
@@ -231,61 +236,201 @@ extension Node._UnsafeHandle {
   }
 }
 
+// MARK: Element-wise Buffer Operations
+extension Node._UnsafeHandle {
+  /// Moves elements from the current handle to the beginning of a new handle. This will deinitialize
+  /// the elements from the current handle. The destination must be uninitialized
+  /// - Parameters:
+  ///   - newHandle: The destination handle to write to.
+  ///   - sourceIndex: The offset of the source handle to move from.
+  ///   - destinationIndex: The offset of the destintion handle to write to. Assumes
+  ///       that all previous values have beeh initialized.
+  @inlinable
+  @inline(__always)
+  internal func moveElements(
+    toHandle newHandle: Node._UnsafeHandle,
+    fromIndex sourceIndex: Int,
+    toIndex destinationIndex: Int = 0
+  ) {
+    assert(sourceIndex >= 0, "Move source index must be positive.")
+    assert(destinationIndex >= 0, "Move destination index must be positive.")
+     
+    self.assertMutable()
+    newHandle.assertMutable()
+    
+    let count = self.numKeys - sourceIndex
+    if count <= 0 { return }
+    
+    // Ensure the newHandle has enough space
+    assert(destinationIndex + count <= newHandle.node.capacity, "Oversized move operation causing overflow.")
+    
+    // TODO: handle children
+    newHandle.keys.advanced(by: destinationIndex).moveInitialize(from: self.keys.advanced(by: sourceIndex), count: count)
+    newHandle.values.advanced(by: destinationIndex).moveInitialize(from: self.values.advanced(by: sourceIndex), count: count)
+    
+    self.setElementCount(sourceIndex)
+    newHandle.setElementCount(destinationIndex + count)
+  }
+  
+  /// Moves elements from the current handle to the beginning of a new handle, while inserting an
+  /// element somewhere in the middle. This adjusts element counts.
+  /// - Parameters:
+  ///   - element: The element to insert and take ownership for
+  ///   - insertionIndex: The index relative to the *source* to insert into.
+  ///   - sourceHandle: The source handle to move from.
+  ///   - sourceIndex: The source values to move from, deinitializing from this
+  ///       index until the end,
+  ///   - destinationIndex: The destination index to start initializing from.
+  @inlinable
+  @inline(__always)
+  internal func moveWithNewElement(
+    _ element: Node.Element,
+    at insertionIndex: Int,
+    fromHandle sourceHandle: Node._UnsafeHandle,
+    fromIndex sourceIndex: Int,
+    toIndex destinationIndex: Int = 0
+  ) {
+    // TOOD: revisit this ugly function
+    assertMutable()
+    sourceHandle.assertMutable()
+    
+    let movedElements = sourceHandle.numKeys - sourceIndex
+    let destinationInsertionIndex = destinationIndex + (insertionIndex - sourceIndex)
+    sourceHandle.moveElements(toHandle: self, fromIndex: insertionIndex, toIndex: destinationInsertionIndex + 1)
+    sourceHandle.moveElements(toHandle: self, fromIndex: sourceIndex, toIndex: destinationIndex)
+    self.insertElement(element, at: destinationInsertionIndex)
+    self.setElementCount(destinationIndex + movedElements + 1)
+  }
+  
+  /// Inserts a new element somewhere into the handle.
+  /// - Parameters:
+  ///   - element: The element to insert which the node will take ownership of.
+  ///   - index: An uninitialized index in the buffer to insert the element into.
+  /// - Warning: This does not adjust the buffer counts.
+  @inlinable
+  @inline(__always)
+  internal func insertElement(_ element: Node.Element, at index: Int) {
+    assertMutable()
+    assert(index < self.node.capacity, "Cannot insert beyond node capacity.")
+    
+    self.keys.advanced(by: index).initialize(to: element.key)
+    self.values.advanced(by: index).initialize(to: element.value)
+  }
+  
+  /// Moves an element out of the handle
+  /// - Parameter index: The in-bounds index of an element to move out
+  /// - Returns: A tuple of the key and value.
+  /// - Warning: This does not adjust buffer counts
+  @inlinable
+  @inline(__always)
+  internal func moveElement(at index: Int) -> Node.Element {
+    assertMutable()
+    assert(index < self.numKeys, "Attempted to move out-of-bounds element.")
+    
+    return (
+      key: self.keys.advanced(by: index).move(),
+      value: self.values.advanced(by: index).move()
+    )
+  }
+  
+  /// Sets the number of elements in this node
+  @inlinable
+  @inline(__always)
+  internal func setElementCount(_ numElements: Int) {
+    assertMutable()
+    assert(numElements <= self.node.capacity, "Cannot set more elements than capacity.")
+    
+    self.numKeys = numElements
+    self.numValues = numElements
+  }
+}
+
 // MARK: Node Mutations
 extension Node._UnsafeHandle {
   /// Inserts a value into this node without considering the children. Be careful when using
   /// this as you can violate the BTree invariants if not careful.
   @usableFromInline
-  internal func _immediatelyInsertValue(_ value: Value, forKey key: Key, at insertionIndex: Int) -> Node._Splinter? {
-    var splinter: Node._Splinter? = nil
+  internal func _immediatelyInsertElement(_ element: Node.Element, at insertionIndex: Int) -> Node._Splinter? {
+    assertMutable()
     
     // If we have a full B-Tree, we'll need to splinter
-    if numKeys == capacity {
-      // v------- median - 1
-      // 0 1 2 3
-      //   ^-- median
-      //     ^-- median + 1
-      let medianIndex = self.numKeys / 2
+    if numKeys == node.capacity {
+      // Right median == left median for BTrees with odd capacity
+      let rightMedian = self.numKeys / 2
+      let leftMedian = (self.numKeys - 1) / 2
       
-      let leftNode = self
+      var splinterElement: Node.Element
+      var rightNode = Node(withCapacity: node.capacity)
       
-      // TODO: optimize this to directly initialize
-      let rightNode = Node(withCapacity: capacity)
-      rightNode.update { handle in
-        let rightNodeElements = medianIndex + 1
-        handle.keys.moveInitialize(
-          from: self.keys.advanced(by: medianIndex + 1),
-          count: numKeys - (medianIndex + 1)
-        )
+      if insertionIndex == rightMedian {
+        splinterElement = element
         
-        handle.values.moveInitialize(
-          from: self.keys.advanced(by: medianIndex + 1),
-          count: numKeys - (medianIndex + 1)
-        )
+        rightNode.update { handle in
+          self.moveElements(toHandle: handle, fromIndex: rightMedian)
+          
+        }
+      } else if insertionIndex > rightMedian {
+        rightNode.update { handle in
+          handle.moveWithNewElement(
+            element,
+            at: insertionIndex,
+            fromHandle: self,
+            fromIndex: rightMedian + 1,
+            toIndex: 0
+          )
+        }
+        
+        splinterElement = self.moveElement(at: rightMedian)
+        self.setElementCount(rightMedian)
+      } else {
+        // insertionIndex < rightMedian
+        
+        rightNode.update { handle in
+          self.moveElements(toHandle: handle, fromIndex: leftMedian + 1, toIndex: 0)
+        }
+        
+        splinterElement = self.moveElement(at: leftMedian)
+        self.setElementCount(leftMedian)
       }
       
-      
+      return Node._Splinter(
+        median: splinterElement,
+        leftChild: node,
+        rightChild: rightNode
+      )
     } else {
-      // TODO: will this trigger a swift_retain/swift_release for each element??
-      self.keys
-        .advanced(by: insertionIndex + 1)
-        .moveAssign(
-          from: self.keys.advanced(by: insertionIndex),
-          count: numKeys - insertionIndex)
+      // Shift over elements near the insertion index.
+      self.moveWithNewElement(
+        element,
+        at: insertionIndex,
+        fromHandle: self,
+        fromIndex: insertionIndex,
+        toIndex: insertionIndex
+      )
       
-      self.values
-        .advanced(by: insertionIndex + 1)
-        .moveAssign(
-          from: self.values.advanced(by: insertionIndex),
-          count: numValues - insertionIndex)
-      
-      self[elementAt: insertionIndex] = (key: key, value: value)
+      return nil
     }
+  }
+  
+  /// Inserts a splinter, attaching the children appropriately
+  /// - Parameters:
+  ///   - splinter: The splinter object from a child
+  ///   - insertionIndex: The index of the child which produced the splinter
+  /// - Returns: Another splinter which may need to be propogated upward
+  @inlinable
+  internal func _insertSplinter(_ splinter: Node._Splinter, at insertionIndex: Int) -> Node._Splinter? {
+    assertMutable()
     
-    self.numKeys += 1
-    self.numValues += 1
-    
-    return splinter
+    let newSplinter = self._immediatelyInsertElement(splinter.median, at: insertionIndex)
+    if var newSplinter = newSplinter {
+      newSplinter.rightChild.update { handle in
+        handle[childAt: 0] = splinter.rightChild
+      }
+      return newSplinter
+    } else {
+      self[childAt: insertionIndex + 1] = splinter.rightChild
+      return nil
+    }
   }
   
   /// Inserts a value into this node or the appropriate child.
@@ -294,28 +439,24 @@ extension Node._UnsafeHandle {
   ///   - key: A key to insert. If this key exists it'll be inserted at last valid position.
   /// - Returns: A splinter which can be used to construct the new upper and right children.
   @inlinable
-  internal func insertValue(_ value: Value, forKey key: Key) -> Node._Splinter? {
-    let insertionIndex = self.lastIndex(of: key)
+  internal func insertElement(_ element: Node.Element) -> Node._Splinter? {
+    assertMutable()
+    checkInvariants()
     
-    // TODO: figure out how to handle duplicates properly
+    let insertionIndex = self.lastIndex(of: element.key)
     
-    // Check the children if it exists. Otherwise we'll assume we're at a "leaf".
-    // This assumes we have a well-formed BTree
-    if insertionIndex < numChildren {
-      // TODO: consider the cost of recursion. Shouldn't be significant as BTrees should maintain very
-      // low height.
-      let childInsertion = self[childAt: insertionIndex].update({ $0.insertValue(value, forKey: key) })
+    // We need to try to insert as deep as possible as first, and have the splinter
+    // bubble up.
+    if self.isLeaf {
+      return self._immediatelyInsertElement(element, at: insertionIndex)
+    } else {
+      let splinter = self[childAt: insertionIndex].update({ $0.insertElement(element) })
       
-      // If the child splintered, we'll need to readjust the node to handle that.
-      if let childSplinter = childInsertion {
-        // The median
-        // TOD: implement
-        
+      if let splinter = splinter {
+        return self._insertSplinter(splinter, at: insertionIndex)
       }
       
       return nil
-    } else {
-      return self._immediatelyInsertValue(value, forKey: key, at: insertionIndex)
     }
   }
   

@@ -25,7 +25,7 @@ extension Node: CustomDebugStringConvertible {
         debugPrint(handle.keys[index], terminator: ", ", to: &result)
         debugPrint(handle.values[index], terminator: ")", to: &result)
       }
-      result += "])"
+      result += "], \(self.children.debugDescription))"
       return result
     }
   }

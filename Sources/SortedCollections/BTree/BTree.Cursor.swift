@@ -128,7 +128,13 @@ extension BTree {
     @inlinable
     @inline(__always)
     internal var rightChild: Cursor? {
-      return self.rightSibling?.leftChild
+      guard self.hasRightChild else { return nil }
+      var newPath = self.path
+      newPath[newPath.count - 1] += 1
+      newPath.append(0)
+      // TODO: concern this is copying the node into the cursor. Desired?
+      let newChild = node.read { $0[childAt: self.elementIndex + 1] }
+      return Cursor(root: root, node: newChild, path: newPath)
     }
     
     // MARK: Cursor Queries

@@ -14,41 +14,41 @@
 internal let BTREE_NODE_CAPACITY = 100
 
 @usableFromInline
-internal struct BTree<Key: Comparable, Value> {
+internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
   typealias Element = (key: Key, value: Value)
   
   /// The underlying node behind this local BTree
   @usableFromInline
-  internal var root: Node<Key, Value>
+  internal var root: _Node<Key, Value>
   
   @inlinable
   @inline(__always)
   internal init() {
-    self.root = Node(withCapacity: BTREE_NODE_CAPACITY)
+    self.root = _Node(isLeaf: false, withCapacity: BTREE_NODE_CAPACITY)
   }
   
   @inlinable
   @inline(__always)
-  internal init(_rootedAt root: Node<Key, Value>) {
+  internal init(rootedAt root: _Node<Key, Value>) {
     self.root = root
   }
 }
 
 // MARK: Mutating Operations
-extension BTree {
+extension _BTree {
   @inlinable
   @inline(__always)
   internal mutating func insertKey(_ key: Key, withValue value: Value) {
     let element = (key: key, value: value)
     if let splinter = root.update({ $0.insertElement(element) }) {
-      self.root = splinter.toNode(withCapacity: BTREE_NODE_CAPACITY)
+      self.root = splinter.toNode(from: root, withCapacity: BTREE_NODE_CAPACITY)
     }
   }
 }
 
 // MARK: Read Operations
-extension BTree {
+extension _BTree {
   /// Returns a cursor to the first key that is equal to given key.
   /// - Returns: If found, returns a cursor to the element, or where
   ///     it would be if it did exist.

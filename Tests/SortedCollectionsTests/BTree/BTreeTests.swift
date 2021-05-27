@@ -23,8 +23,8 @@ final class BTreeTests: CollectionTestCase {
       (key: 3, value: "4"),
     ]
     
-    let node = Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: keyValuePairs.count)
-    let btree = BTree(_rootedAt: node)
+    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: keyValuePairs.count)
+    let btree = _BTree(rootedAt: node)
     
     expectEqualElements(btree, keyValuePairs)
   }
@@ -35,22 +35,35 @@ final class BTreeTests: CollectionTestCase {
       (key: 2, value: "1"),
     ]
     
-    let node = Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 2)
-    var btree = BTree(_rootedAt: node)
+    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 2)
+    var btree = _BTree(rootedAt: node)
     
-    btree.insertValue("A", forKey: 1)
+    btree.insertKey(1, withValue: "A")
     
     var it = btree.makeIterator()
-    print(it.next())
-    print(it.next())
-    print(it.next())
-    print(it.next())
+    print(it.next() as Any)
+    print(it.next() as Any)
+    print(it.next() as Any)
+    print(it.next() as Any)
     
 //    expectEqualElements(btree, [
 //      (key: 1, value: "0"),
 //      (key: 1, value: "A"),
 //      (key: 2, value: "1"),
 //    ])
+  }
+  
+  func test_23treeSplitting() {
+    let node = _Node<Int, String>(_keyValuePairs: [
+      (key: 2, value: "0"),
+      (key: 4, value: "1"),
+    ], capacity: 2)
+    
+    var btree = _BTree(rootedAt: node)
+    
+    print(btree)
+    btree.insertKey(3, withValue: "A")
+    btree.insertKey(4, withValue: "B")
   }
   
   func test_insertWithoutSplit() {
@@ -62,11 +75,13 @@ final class BTreeTests: CollectionTestCase {
       (key: 3, value: "4"),
     ]
     
-    let node = Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 100)
-    var btree = BTree(_rootedAt: node)
+    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 100)
+    var btree = _BTree(rootedAt: node)
+    debugPrint(btree)
     
-    btree.insertValue("A", forKey: 2)
-    btree.insertValue("B", forKey: 4)
+    btree.insertKey(2, withValue: "A")
+    btree.insertKey(4, withValue: "B")
+    debugPrint(btree)
     
     expectEqualElements(btree, [
       (key: 1, value: "0"),

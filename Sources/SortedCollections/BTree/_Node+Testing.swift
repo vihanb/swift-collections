@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension Node {
+extension _Node {
   /// Initialize a node from a list of key-value tuples.
   @_spi(Testing)
   public init<C: Collection>(
@@ -17,7 +17,7 @@ extension Node {
     capacity: Int
   ) where C.Element == Element {
     precondition(keyValuePairs.count <= capacity, "Too many key-value pairs.")
-    self.init(withCapacity: capacity)
+    self.init(isLeaf: true, withCapacity: capacity)
     
     self.update { handle in
       let sortedKeyValuePairs = keyValuePairs.sorted(by: { $0.key < $1.key })
@@ -29,7 +29,6 @@ extension Node {
       }
       handle.numKeys = keyValuePairs.count
       handle.numValues = keyValuePairs.count
-      handle.numChildren = 0
     }
   }
 }

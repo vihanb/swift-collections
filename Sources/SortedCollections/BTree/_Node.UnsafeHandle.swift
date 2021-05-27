@@ -9,17 +9,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension Node {
+extension _Node {
   @usableFromInline
-  internal struct _UnsafeHandle {
+  internal struct UnsafeHandle {
     @usableFromInline
-    internal let keyHeader: UnsafeMutablePointer<_BufferHeader>
+    internal let keyHeader: UnsafeMutablePointer<BufferHeader>
     
     @usableFromInline
-    internal let valueHeader: UnsafeMutablePointer<_BufferHeader>
+    internal let valueHeader: UnsafeMutablePointer<BufferHeader>
     
     @usableFromInline
-    internal let childrenHeader: UnsafeMutablePointer<_BufferHeader>
+    internal let childrenHeader: UnsafeMutablePointer<BufferHeader>?
     
     @usableFromInline
     internal let keys: UnsafeMutablePointer<Key>
@@ -28,21 +28,21 @@ extension Node {
     internal let values: UnsafeMutablePointer<Value>
     
     @usableFromInline
-    internal let children: UnsafeMutablePointer<Node<Key, Value>>
+    internal let children: UnsafeMutablePointer<_Node<Key, Value>>?
     
     @usableFromInline
-    internal let node: Node
+    internal let capacity: Int
     
     @inlinable
     @inline(__always)
     internal init(
-      keyHeader: UnsafeMutablePointer<_BufferHeader>,
-      valueHeader: UnsafeMutablePointer<_BufferHeader>,
-      childrenHeader: UnsafeMutablePointer<_BufferHeader>,
+      keyHeader: UnsafeMutablePointer<BufferHeader>,
+      valueHeader: UnsafeMutablePointer<BufferHeader>,
+      childrenHeader: UnsafeMutablePointer<BufferHeader>?,
       keys: UnsafeMutablePointer<Key>,
       values: UnsafeMutablePointer<Value>,
-      children: UnsafeMutablePointer<Node<Key, Value>>,
-      node: Node,
+      children: UnsafeMutablePointer<_Node<Key, Value>>?,
+      capacity: Int,
       isMutable: Bool
     ) {
       self.keyHeader = keyHeader
@@ -51,7 +51,7 @@ extension Node {
       self.keys = keys
       self.values = values
       self.children = children
-      self.node = node
+      self.capacity = capacity
       
       #if COLLECTIONS_INTERNAL_CHECKS
       self.isMutable = isMutable
@@ -100,7 +100,7 @@ extension Node {
     /// Creates a mutable version of this handle
     @inlinable
     @inline(__always)
-    internal init(mutableCopyOf handle: _UnsafeHandle) {
+    internal init(mutableCopyOf handle: UnsafeHandle) {
       self.init(
         keyHeader: handle.keyHeader,
         valueHeader: handle.valueHeader,
@@ -108,7 +108,7 @@ extension Node {
         keys: handle.keys,
         values: handle.values,
         children: handle.children,
-        node: handle.node,
+        capacity: handle.capacity,
         isMutable: true
       )
     }
@@ -131,21 +131,29 @@ extension Node {
     @inlinable
     @inline(__always)
     internal var numChildren: Int {
-      get { childrenHeader.pointee.count }
-      nonmutating set { assertMutable(); childrenHeader.pointee.count = newValue }
+      get { childrenHeader?.pointee.count ?? 0 }
+      nonmutating set {
+        assertMutable()
+        #if DEBUG
+        if isLeaf && newValue != 0 {
+          assertionFailure("Cannot set non-zero number of children on a leaf")
+        }
+        #endif
+        childrenHeader!.pointee.count = newValue
+      }
     }
     
     @inlinable
     @inline(__always)
-    internal var isLeaf: Bool { self.numChildren == 0 }
+    internal var isLeaf: Bool { childrenHeader == nil }
   }
 }
 
 // MARK: Subscript
-extension Node._UnsafeHandle {
+extension _Node.UnsafeHandle {
   @inlinable
   @inline(__always)
-  internal subscript(elementAt index: Int) -> Node.Element {
+  internal subscript(elementAt index: Int) -> _Node.Element {
     get {
       assert(index < self.numKeys, "Node element subscript out of bounds.")
       return (key: self.keys[index], value: self.values[index])
@@ -179,22 +187,24 @@ extension Node._UnsafeHandle {
   // TODO: consider implementing `_modify` for these subscripts
   @inlinable
   @inline(__always)
-  internal subscript(childAt index: Int) -> Node {
+  internal subscript(childAt index: Int) -> _Node {
     get {
       assert(index < self.numChildren, "Node child subscript out of bounds")
-      return self.children[index]
+      assert(!isLeaf, "Cannot access children of leaf node.")
+      return self.children![index]
     }
     
     nonmutating set(newChild) {
       assertMutable()
       assert(index < self.numChildren, "Node element subscript out of bounds.")
-      self.children[index] = newChild
+      assert(!isLeaf, "Cannot access children of leaf node.")
+      self.children![index] = newChild
     }
   }
 }
 
 // MARK: Binary Search
-extension Node._UnsafeHandle {
+extension _Node.UnsafeHandle {
   /// Performs O(log n) search for a key, returning the first instance when duplicates exist. This
   /// returns the first possible insertion point for `key`.
   @usableFromInline
@@ -237,7 +247,7 @@ extension Node._UnsafeHandle {
 }
 
 // MARK: Element-wise Buffer Operations
-extension Node._UnsafeHandle {
+extension _Node.UnsafeHandle {
   /// Moves elements from the current handle to the beginning of a new handle. This will deinitialize
   /// the elements from the current handle. The destination must be uninitialized
   /// - Parameters:
@@ -248,7 +258,7 @@ extension Node._UnsafeHandle {
   @inlinable
   @inline(__always)
   internal func moveElements(
-    toHandle newHandle: Node._UnsafeHandle,
+    toHandle newHandle: _Node.UnsafeHandle,
     fromIndex sourceIndex: Int,
     toIndex destinationIndex: Int = 0
   ) {
@@ -262,7 +272,7 @@ extension Node._UnsafeHandle {
     if count <= 0 { return }
     
     // Ensure the newHandle has enough space
-    assert(destinationIndex + count <= newHandle.node.capacity, "Oversized move operation causing overflow.")
+    assert(destinationIndex + count <= newHandle.capacity, "Oversized move operation causing overflow.")
     
     // TODO: handle children
     newHandle.keys.advanced(by: destinationIndex).moveInitialize(from: self.keys.advanced(by: sourceIndex), count: count)
@@ -284,9 +294,9 @@ extension Node._UnsafeHandle {
   @inlinable
   @inline(__always)
   internal func moveWithNewElement(
-    _ element: Node.Element,
+    _ element: _Node.Element,
     at insertionIndex: Int,
-    fromHandle sourceHandle: Node._UnsafeHandle,
+    fromHandle sourceHandle: _Node.UnsafeHandle,
     fromIndex sourceIndex: Int,
     toIndex destinationIndex: Int = 0
   ) {
@@ -309,9 +319,9 @@ extension Node._UnsafeHandle {
   /// - Warning: This does not adjust the buffer counts.
   @inlinable
   @inline(__always)
-  internal func insertElement(_ element: Node.Element, at index: Int) {
+  internal func insertElement(_ element: _Node.Element, at index: Int) {
     assertMutable()
-    assert(index < self.node.capacity, "Cannot insert beyond node capacity.")
+    assert(index < self.capacity, "Cannot insert beyond node capacity.")
     
     self.keys.advanced(by: index).initialize(to: element.key)
     self.values.advanced(by: index).initialize(to: element.value)
@@ -323,7 +333,7 @@ extension Node._UnsafeHandle {
   /// - Warning: This does not adjust buffer counts
   @inlinable
   @inline(__always)
-  internal func moveElement(at index: Int) -> Node.Element {
+  internal func moveElement(at index: Int) -> _Node.Element {
     assertMutable()
     assert(index < self.numKeys, "Attempted to move out-of-bounds element.")
     
@@ -338,7 +348,7 @@ extension Node._UnsafeHandle {
   @inline(__always)
   internal func setElementCount(_ numElements: Int) {
     assertMutable()
-    assert(numElements <= self.node.capacity, "Cannot set more elements than capacity.")
+    assert(numElements <= self.capacity, "Cannot set more elements than capacity.")
     
     self.numKeys = numElements
     self.numValues = numElements
@@ -346,28 +356,27 @@ extension Node._UnsafeHandle {
 }
 
 // MARK: Node Mutations
-extension Node._UnsafeHandle {
+extension _Node.UnsafeHandle {
   /// Inserts a value into this node without considering the children. Be careful when using
   /// this as you can violate the BTree invariants if not careful.
   @usableFromInline
-  internal func _immediatelyInsertElement(_ element: Node.Element, at insertionIndex: Int) -> Node._Splinter? {
+  internal func _immediatelyInsertElement(_ element: _Node.Element, at insertionIndex: Int) -> _Node.Splinter? {
     assertMutable()
     
     // If we have a full B-Tree, we'll need to splinter
-    if numKeys == node.capacity {
+    if self.numKeys == self.capacity {
       // Right median == left median for BTrees with odd capacity
       let rightMedian = self.numKeys / 2
       let leftMedian = (self.numKeys - 1) / 2
       
-      var splinterElement: Node.Element
-      var rightNode = Node(withCapacity: node.capacity)
+      var splinterElement: _Node.Element
+      var rightNode = _Node(isLeaf: self.isLeaf, withCapacity: self.capacity)
       
       if insertionIndex == rightMedian {
         splinterElement = element
         
         rightNode.update { handle in
           self.moveElements(toHandle: handle, fromIndex: rightMedian)
-          
         }
       } else if insertionIndex > rightMedian {
         rightNode.update { handle in
@@ -393,9 +402,8 @@ extension Node._UnsafeHandle {
         self.setElementCount(leftMedian)
       }
       
-      return Node._Splinter(
+      return _Node.Splinter(
         median: splinterElement,
-        leftChild: node,
         rightChild: rightNode
       )
     } else {
@@ -418,7 +426,7 @@ extension Node._UnsafeHandle {
   ///   - insertionIndex: The index of the child which produced the splinter
   /// - Returns: Another splinter which may need to be propogated upward
   @inlinable
-  internal func _insertSplinter(_ splinter: Node._Splinter, at insertionIndex: Int) -> Node._Splinter? {
+  internal func _insertSplinter(_ splinter: _Node.Splinter, at insertionIndex: Int) -> _Node.Splinter? {
     assertMutable()
     
     let newSplinter = self._immediatelyInsertElement(splinter.median, at: insertionIndex)
@@ -439,7 +447,7 @@ extension Node._UnsafeHandle {
   ///   - key: A key to insert. If this key exists it'll be inserted at last valid position.
   /// - Returns: A splinter which can be used to construct the new upper and right children.
   @inlinable
-  internal func insertElement(_ element: Node.Element) -> Node._Splinter? {
+  internal func insertElement(_ element: _Node.Element) -> _Node.Splinter? {
     assertMutable()
     checkInvariants()
     

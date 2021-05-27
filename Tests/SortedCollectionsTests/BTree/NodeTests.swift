@@ -15,13 +15,7 @@ import CollectionsTestSupport
 
 final class NodeTests: CollectionTestCase {
   func test_COW() {
-    #if COLLECTIONS_INTERNAL_CHECKS
-    expectEqual(1, 1)
-    #else
-    expectEqual(1, 0)
-    #endif
-    
-    let nodeA = Node<Int, String>(_keyValuePairs: [], capacity: 5)
+    let nodeA = _Node<Int, String>(_keyValuePairs: [], capacity: 5)
 //    let nodeB = nodeA
 //    _ = nodeB.insertValue("A", forKey: 1)
 //    expectEqual(nodeA.count, 0)
@@ -29,19 +23,8 @@ final class NodeTests: CollectionTestCase {
   }
 //
   
-  func test_23treeSplitting() {
-    var node = Node<Int, String>(_keyValuePairs: [
-      (key: 2, value: "0"),
-      (key: 4, value: "1"),
-    ], capacity: 2)
-    
-    node.update { handle in
-      _ = handle.insertValue("A", forKey: 3)
-    }
-  }
-  
   func test_singleNodeInsertion() {
-    var node = Node<Int, String>(_keyValuePairs: [
+    var node = _Node<Int, String>(_keyValuePairs: [
       (key: 1, value: "0"),
       (key: 2, value: "1"),
       (key: 2, value: "2"),
@@ -51,10 +34,10 @@ final class NodeTests: CollectionTestCase {
     ], capacity: 100)
 
     node.update { handle in
-      _ = handle.insertValue("A", forKey: 0)
-      _ = handle.insertValue("B", forKey: 2)
-      _ = handle.insertValue("C", forKey: 3)
-      _ = handle.insertValue("D", forKey: 4)
+      _ = handle.insertElement((key: 0, value: "A"))
+      _ = handle.insertElement((key: 2, value: "B"))
+      _ = handle.insertElement((key: 3, value: "C"))
+      _ = handle.insertElement((key: 4, value: "D"))
     }
     
     node.read { handle in
@@ -63,7 +46,7 @@ final class NodeTests: CollectionTestCase {
       expectEqual(handle.numChildren, 0)
     }
     
-    expectEqualElements(BTree(_rootedAt: node), [
+    expectEqualElements(_BTree(rootedAt: node), [
       (key: 0, value: "A"),
       (key: 1, value: "0"),
       (key: 2, value: "1"),
@@ -78,7 +61,7 @@ final class NodeTests: CollectionTestCase {
   }
   
   func test_binarySearchMiddle() {
-    let node = Node<Int, String>(_keyValuePairs: [
+    let node = _Node<Int, String>(_keyValuePairs: [
       (key: 0, value: "0"),
       (key: 2, value: "1"),
       (key: 4, value: "2"),
@@ -93,7 +76,7 @@ final class NodeTests: CollectionTestCase {
   }
   
   func test_binarySearchOdd() {
-    let node = Node<Int, String>(_keyValuePairs: [
+    let node = _Node<Int, String>(_keyValuePairs: [
       (key: 1, value: "0"),
       (key: 2, value: "1"),
       (key: 2, value: "2"),
@@ -119,7 +102,7 @@ final class NodeTests: CollectionTestCase {
   }
   
   func test_binarySearchEven() {
-    let node = Node<Int, String>(_keyValuePairs: [
+    let node = _Node<Int, String>(_keyValuePairs: [
       (key: 1, value: "0"),
       (key: 2, value: "1"),
       (key: 2, value: "2"),

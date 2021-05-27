@@ -12,7 +12,7 @@
 /// A collection which maintains key-value pairs in ascending sorted order.
 public struct SortedDictionary<Key: Comparable, Value> {
   @usableFromInline
-  internal var root: BTree<Key, Value>
+  internal var root: _BTree<Key, Value>
   
   /// Creates an empty dictionary.
   /// 
@@ -20,7 +20,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   public init() {
-    self.root = BTree()
+    self.root = _BTree()
   }
   
   /// Creates a dictionary from a sequence of key-value pairs which must

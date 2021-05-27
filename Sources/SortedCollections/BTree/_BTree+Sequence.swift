@@ -10,19 +10,19 @@
 //===----------------------------------------------------------------------===//
 
 
-extension BTree: Sequence {
+extension _BTree: Sequence {
   @usableFromInline
   typealias Iterator = NodeIterator
   
   @usableFromInline
   internal struct NodeIterator: IteratorProtocol {
     @usableFromInline
-    typealias Element = BTree.Element
+    typealias Element = _BTree.Element
     
     /// This is a path refering to child offsets
     private var currentCursor: Cursor?
     
-    internal init(startingAt btree: BTree) {
+    internal init(startingAt btree: _BTree) {
       self.currentCursor = Cursor(firstElementOf: btree)
     }
     

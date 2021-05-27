@@ -9,9 +9,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension Node {
+extension _Node {
   @usableFromInline
-  internal struct _BufferHeader {
+  internal struct BufferHeader {
     @usableFromInline
     internal var count: Int
     
@@ -22,7 +22,7 @@ extension Node {
   }
   
   @usableFromInline
-  internal class _Buffer<Element>: ManagedBuffer<_BufferHeader, Element> {
+  internal class Buffer<Element>: ManagedBuffer<BufferHeader, Element> {
     @inlinable
     deinit {
       _ = self.withUnsafeMutablePointers { header, elements in

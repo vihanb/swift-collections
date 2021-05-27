@@ -9,14 +9,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension Node {
+extension _Node {
   @usableFromInline
-  internal struct _Storage<Element> {
+  internal struct Storage<Element> {
     @usableFromInline
-    typealias Buffer = Node._Buffer<Element>
+    typealias Buffer = _Node.Buffer<Element>
     
     @usableFromInline
-    typealias BufferHeader = Node._BufferHeader
+    typealias BufferHeader = _Node.BufferHeader
     
     @usableFromInline
     typealias Pointer = ManagedBufferPointer<BufferHeader, Element>
@@ -33,7 +33,7 @@ extension Node {
 }
 
 // MARK: Convenience initializers
-extension Node._Storage {
+extension _Node.Storage {
   @inlinable
   @inline(__always)
   internal init(capacity: Int, count: Int = 0) {
@@ -58,31 +58,31 @@ extension Node._Storage {
 }
 
 // MARK: CoW
-extension Node._Storage {
+extension _Node.Storage {
   /// Ensure that this storage refers to a uniquely held buffer by copying
   /// elements if necessary.
   @inlinable
   @inline(__always)
   internal mutating func ensureUnique(capacity: Int) {
     if !self.buffer.isUniqueReference() {
-      self = Node._Storage(copyingFrom: self, capacity: capacity)
+      self = _Node.Storage(copyingFrom: self, capacity: capacity)
     }
   }
 }
 
 // MARK: Sequence
-extension Node._Storage: Sequence {
+extension _Node.Storage: Sequence {
   @usableFromInline
   internal struct Iterator: IteratorProtocol {
     @usableFromInline
-    internal let storage: Node._Storage<Element>
+    internal let storage: _Node.Storage<Element>
     
     @usableFromInline
     internal var index: Int
     
     @inlinable
     @inline(__always)
-    internal init(storage: Node._Storage<Element>) {
+    internal init(storage: _Node.Storage<Element>) {
       self.storage = storage
       self.index = 0
     }
@@ -107,7 +107,7 @@ extension Node._Storage: Sequence {
 }
 
 // MARK: CustomDebugStringConvertible
-extension Node._Storage: CustomDebugStringConvertible {
+extension _Node.Storage: CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
     Array(self).debugDescription

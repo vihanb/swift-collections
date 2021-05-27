@@ -9,15 +9,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension BTree {
+extension _BTree {
   @usableFromInline
   struct Cursor {
     @usableFromInline
-    internal let root: Node<Key, Value>
+    internal let root: _Node<Key, Value>
   
     // TODO: consider whether the entire path of nodes should be stored.
     @usableFromInline
-    internal let node: Node<Key, Value>
+    internal let node: _Node<Key, Value>
     
     // TODO: potentially use a fixed-size buffer to avoid
     // array overhead since the maximum height for tree with
@@ -34,7 +34,7 @@ extension BTree {
     /// - Complexity: O(`log n`) worst case.
     @inlinable
     @inline(__always)
-    internal init(root: Node<Key, Value>, node: Node<Key, Value>, path: [Int]) {
+    internal init(root: _Node<Key, Value>, node: _Node<Key, Value>, path: [Int]) {
       self.root = root
       self.node = node
       self.path = path
@@ -47,7 +47,7 @@ extension BTree {
     /// - Complexity: O(`log n`) worst-case.
     @inlinable
     @inline(__always)
-    internal init(root: Node<Key, Value>, path: [Int]) {
+    internal init(root: _Node<Key, Value>, path: [Int]) {
       self.root = root
       self.path = path
       
@@ -65,7 +65,7 @@ extension BTree {
     /// - Parameter btree: the non-empty BTree
     /// - Complexity: O(`log n`)
     @inlinable
-    internal init?(firstElementOf btree: BTree) {
+    internal init?(firstElementOf btree: _BTree) {
       // Cannot create a cursor for an empty tree.
       if btree.root.read({ $0.numKeys == 0 }) {
         return nil
@@ -73,10 +73,11 @@ extension BTree {
       
       self.root = btree.root
       
+      // Calculate the depth of the tree
       var node = self.root
       var depth = 1
-      while node.read({ $0.numChildren }) > 0 {
-        node = node.read({ $0.children.pointee })
+      while let children = node.read({ $0.children }) {
+        node = children.pointee
         depth += 1
       }
       
@@ -89,7 +90,11 @@ extension BTree {
     @inline(__always)
     internal func advanced() -> Cursor? {
       // Try visiting each of the nodes if the exist.
-      return self.rightChild ?? self.rightSibling ?? self.parent
+      if let nextElement = self.rightChild ?? self.rightSibling {
+        return nextElement
+      }
+      
+      //
     }
     
     // MARK: Tree-wise Cursor Movements
@@ -121,7 +126,7 @@ extension BTree {
       var newPath = self.path
       newPath.append(0)
       // TODO: concern this is copying the node into the cursor. Desired?
-      let newChild = node.read { $0[childAt: self.elementIndex] }
+      let newChild = node.read { $0[childAt: self.elementSlot] }
       return Cursor(root: root, node: newChild, path: newPath)
     }
     
@@ -133,7 +138,7 @@ extension BTree {
       newPath[newPath.count - 1] += 1
       newPath.append(0)
       // TODO: concern this is copying the node into the cursor. Desired?
-      let newChild = node.read { $0[childAt: self.elementIndex + 1] }
+      let newChild = node.read { $0[childAt: self.elementSlot + 1] }
       return Cursor(root: root, node: newChild, path: newPath)
     }
     
@@ -142,34 +147,34 @@ extension BTree {
     /// The index of the current element in it's node
     @inlinable
     @inline(__always)
-    internal var elementIndex: Int { self.path[self.path.count - 1] }
+    internal var elementSlot: Int { self.path[self.path.count - 1] }
     
     /// Checks if there is a sibling after the current cursor
     @inlinable
     @inline(__always)
     internal var hasRightSibling: Bool {
-      self.node.read { self.elementIndex + 1 < $0.numKeys }
+      self.node.read { self.elementSlot + 1 < $0.numKeys }
     }
     
     /// Checks if there is a left-child
     @inlinable
     @inline(__always)
     internal var hasLeftChild: Bool {
-      self.node.read { self.elementIndex < $0.numChildren }
+      self.node.read { self.elementSlot < $0.numChildren }
     }
     
     /// Checks if there is a right-child
     @inlinable
     @inline(__always)
     internal var hasRightChild: Bool {
-      self.node.read { self.elementIndex + 1 < $0.numChildren }
+      self.node.read { self.elementSlot + 1 < $0.numChildren }
     }
     
     /// Gets the element the cursor points to
     @inlinable
     @inline(__always)
     internal var element: Element {
-      return self.node.read { $0[elementAt: self.elementIndex] }
+      return self.node.read { $0[elementAt: self.elementSlot] }
     }
   }
 }

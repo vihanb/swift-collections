@@ -40,7 +40,7 @@ extension _BTree: CustomDebugStringConvertible {
         
         switch position {
         case .start: return "┏━━━" + lineToInsert
-        case .middle: return "╺━━━" + lineToInsert
+        case .middle: return "┣━━━" + lineToInsert
         case .end: return "┗━━━" + lineToInsert
         }
       }

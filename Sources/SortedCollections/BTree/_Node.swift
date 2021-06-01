@@ -83,9 +83,9 @@ extension _Node {
   /// Allows mutable access to the underlying data behind the node.
   ///
   /// - Parameter body: A closure with a handle which allows interacting with the node
+  /// - Returns: The closure's return value, if exists
   @inlinable
   @inline(__always)
-  @discardableResult
   internal mutating func update<R>(_ body: (UnsafeHandle) throws -> R) rethrows -> R {
     self.ensureUnique()
     return try self.read { handle in

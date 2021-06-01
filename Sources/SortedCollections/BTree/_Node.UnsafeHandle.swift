@@ -128,26 +128,52 @@ extension _Node {
       nonmutating set { assertMutable(); valueHeader.pointee.count = newValue }
     }
     
+    // TODO: potentially optimize to defining as numKeys + 1
     @inlinable
     @inline(__always)
     internal var numChildren: Int {
       get { childrenHeader?.pointee.count ?? 0 }
       nonmutating set {
         assertMutable()
-        #if DEBUG
-        if isLeaf && newValue != 0 {
-          assertionFailure("Cannot set non-zero number of children on a leaf")
-        }
-        #endif
+        assert(!isLeaf || newValue != 0, "Cannot set non-zero number of children on a leaf")
+        // TODO: unwrap overhead?
         childrenHeader!.pointee.count = newValue
       }
     }
     
+    // TODO: determine whether this is true or false more often than not.
     @inlinable
     @inline(__always)
     internal var isLeaf: Bool { childrenHeader == nil }
   }
 }
+
+// MARK: CustomDebugStringConvertible
+extension _Node.UnsafeHandle: CustomDebugStringConvertible {
+  /// A textual representation of this instance, suitable for debugging.
+  public var debugDescription: String {
+    var result = "Node<\(Key.self), \(Value.self)>(["
+    var first = true
+    for index in 0..<self.numKeys {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      result += "("
+      debugPrint(self[keyAt: index], terminator: ", ", to: &result)
+      debugPrint(self[valueAt: index], terminator: ")", to: &result)
+    }
+    result += "], "
+    if let children = self.children {
+      debugPrint(Array(UnsafeBufferPointer(start: children, count: self.numChildren)), terminator: ")", to: &result)
+    } else {
+      result += "[])"
+    }
+    return result
+  }
+}
+
 
 // MARK: Subscript
 extension _Node.UnsafeHandle {
@@ -248,68 +274,67 @@ extension _Node.UnsafeHandle {
 
 // MARK: Element-wise Buffer Operations
 extension _Node.UnsafeHandle {
-  /// Moves elements from the current handle to the beginning of a new handle. This will deinitialize
-  /// the elements from the current handle. The destination must be uninitialized
+  /// Moves elements from the current handle to a new handle
   /// - Parameters:
-  ///   - newHandle: The destination handle to write to.
+  ///   - newHandle: The destination handle to write to which could be the same
+  ///       as the source to move within a handle.
   ///   - sourceIndex: The offset of the source handle to move from.
-  ///   - destinationIndex: The offset of the destintion handle to write to. Assumes
-  ///       that all previous values have beeh initialized.
+  ///   - destinationIndex: The offset of the destintion handle to write to.
+  ///   - count: The amount of values to move
+  /// - Warning: This does not adjust the buffer counts.
   @inlinable
   @inline(__always)
   internal func moveElements(
     toHandle newHandle: _Node.UnsafeHandle,
     fromIndex sourceIndex: Int,
-    toIndex destinationIndex: Int = 0
+    toIndex destinationIndex: Int,
+    count: Int
   ) {
     assert(sourceIndex >= 0, "Move source index must be positive.")
     assert(destinationIndex >= 0, "Move destination index must be positive.")
-     
+    assert(count >= 0, "Amount of elements to move be positive.")
+    assert(sourceIndex + count <= self.capacity, "Cannot move elements beyond source buffer capacity.")
+    assert(destinationIndex + count <= newHandle.capacity, "Cannot move elements beyond destination buffer capacity.")
+    
     self.assertMutable()
     newHandle.assertMutable()
     
-    let count = self.numKeys - sourceIndex
-    if count <= 0 { return }
+    newHandle.keys.advanced(by: destinationIndex)
+      .moveInitialize(from: self.keys.advanced(by: sourceIndex), count: count)
     
-    // Ensure the newHandle has enough space
-    assert(destinationIndex + count <= newHandle.capacity, "Oversized move operation causing overflow.")
-    
-    // TODO: handle children
-    newHandle.keys.advanced(by: destinationIndex).moveInitialize(from: self.keys.advanced(by: sourceIndex), count: count)
-    newHandle.values.advanced(by: destinationIndex).moveInitialize(from: self.values.advanced(by: sourceIndex), count: count)
-    
-    self.setElementCount(sourceIndex)
-    newHandle.setElementCount(destinationIndex + count)
+    newHandle.values.advanced(by: destinationIndex)
+      .moveInitialize(from: self.values.advanced(by: sourceIndex), count: count)
   }
   
-  /// Moves elements from the current handle to the beginning of a new handle, while inserting an
-  /// element somewhere in the middle. This adjusts element counts.
+  /// Moves children from the current handle to a new handle
   /// - Parameters:
-  ///   - element: The element to insert and take ownership for
-  ///   - insertionIndex: The index relative to the *source* to insert into.
-  ///   - sourceHandle: The source handle to move from.
-  ///   - sourceIndex: The source values to move from, deinitializing from this
-  ///       index until the end,
-  ///   - destinationIndex: The destination index to start initializing from.
+  ///   - newHandle: The destination handle to write to which could be the same
+  ///       as the source to move within a handle.
+  ///   - sourceIndex: The offset of the source handle to move from.
+  ///   - destinationIndex: The offset of the destintion handle to write to.
+  ///   - count: The amount of values to move
+  /// - Warning: This does not adjust the buffer counts.
   @inlinable
   @inline(__always)
-  internal func moveWithNewElement(
-    _ element: _Node.Element,
-    at insertionIndex: Int,
-    fromHandle sourceHandle: _Node.UnsafeHandle,
+  internal func moveChildren(
+    toHandle newHandle: _Node.UnsafeHandle,
     fromIndex sourceIndex: Int,
-    toIndex destinationIndex: Int = 0
+    toIndex destinationIndex: Int,
+    count: Int
   ) {
-    // TOOD: revisit this ugly function
-    assertMutable()
-    sourceHandle.assertMutable()
+    assert(sourceIndex >= 0, "Move source index must be positive.")
+    assert(destinationIndex >= 0, "Move destination index must be positive.")
+    assert(count >= 0, "Amount of children to move be positive.")
+    assert(sourceIndex + count <= self.capacity + 1, "Cannot move children beyond source buffer capacity.")
+    assert(destinationIndex + count <= newHandle.capacity + 1, "Cannot move children beyond destination buffer capacity.")
+    assert(!newHandle.isLeaf, "Cannot move children to a leaf node")
+    assert(!self.isLeaf, "Cannot move chidlren from a leaf node")
     
-    let movedElements = sourceHandle.numKeys - sourceIndex
-    let destinationInsertionIndex = destinationIndex + (insertionIndex - sourceIndex)
-    sourceHandle.moveElements(toHandle: self, fromIndex: insertionIndex, toIndex: destinationInsertionIndex + 1)
-    sourceHandle.moveElements(toHandle: self, fromIndex: sourceIndex, toIndex: destinationIndex)
-    self.insertElement(element, at: destinationInsertionIndex)
-    self.setElementCount(destinationIndex + movedElements + 1)
+    self.assertMutable()
+    newHandle.assertMutable()
+    
+    newHandle.children!.advanced(by: destinationIndex)
+      .moveInitialize(from: self.children!.advanced(by: sourceIndex), count: count)
   }
   
   /// Inserts a new element somewhere into the handle.
@@ -319,12 +344,17 @@ extension _Node.UnsafeHandle {
   /// - Warning: This does not adjust the buffer counts.
   @inlinable
   @inline(__always)
-  internal func insertElement(_ element: _Node.Element, at index: Int) {
+  internal func insertElement(_ element: _Node.Element, withRightChild rightChild: _Node?, at index: Int) {
     assertMutable()
     assert(index < self.capacity, "Cannot insert beyond node capacity.")
+    assert(self.isLeaf == (rightChild == nil), "A child can only be inserted iff the node is a leaf.")
     
     self.keys.advanced(by: index).initialize(to: element.key)
     self.values.advanced(by: index).initialize(to: element.value)
+    
+    if let rightChild = rightChild {
+      self.children!.advanced(by: index + 1).initialize(to: rightChild)
+    }
   }
   
   /// Moves an element out of the handle
@@ -343,7 +373,8 @@ extension _Node.UnsafeHandle {
     )
   }
   
-  /// Sets the number of elements in this node
+  /// Sets the number of elements in this node. Also updates children count
+  /// if a non-leaf node.
   @inlinable
   @inline(__always)
   internal func setElementCount(_ numElements: Int) {
@@ -352,6 +383,10 @@ extension _Node.UnsafeHandle {
     
     self.numKeys = numElements
     self.numValues = numElements
+    
+    if !self.isLeaf {
+      self.numChildren = numElements + 1
+    }
   }
 }
 
@@ -360,8 +395,13 @@ extension _Node.UnsafeHandle {
   /// Inserts a value into this node without considering the children. Be careful when using
   /// this as you can violate the BTree invariants if not careful.
   @usableFromInline
-  internal func _immediatelyInsertElement(_ element: _Node.Element, at insertionIndex: Int) -> _Node.Splinter? {
+  internal func immediatelyInsert(
+    element: _Node.Element,
+    withRightChild rightChild: _Node?,
+    at insertionIndex: Int
+  ) -> _Node.Splinter? {
     assertMutable()
+    assert(self.isLeaf == (rightChild == nil), "A child can only be inserted iff the node is a leaf.")
     
     // If we have a full B-Tree, we'll need to splinter
     if self.numKeys == self.capacity {
@@ -375,31 +415,103 @@ extension _Node.UnsafeHandle {
       if insertionIndex == rightMedian {
         splinterElement = element
         
+        let numLeftElements = rightMedian
+        let numRightElements = self.numKeys - rightMedian
+        
         rightNode.update { handle in
-          self.moveElements(toHandle: handle, fromIndex: rightMedian)
+          self.moveElements(toHandle: handle, fromIndex: rightMedian, toIndex: 0, count: numRightElements)
+          
+          // TODO: also possible to do !self.isLeaf and force unwrap right child to
+          // help the compiler avoid this branch.
+          if let rightChild = rightChild {
+            handle.children!.initialize(to: rightChild)
+            self.moveChildren(toHandle: handle, fromIndex: rightMedian + 1, toIndex: 1, count: numRightElements)
+          }
+          
+          self.setElementCount(numLeftElements)
+          handle.setElementCount(numRightElements)
         }
       } else if insertionIndex > rightMedian {
-        rightNode.update { handle in
-          handle.moveWithNewElement(
-            element,
-            at: insertionIndex,
-            fromHandle: self,
-            fromIndex: rightMedian + 1,
-            toIndex: 0
-          )
-        }
-        
         splinterElement = self.moveElement(at: rightMedian)
-        self.setElementCount(rightMedian)
+        
+        rightNode.update { handle in
+          let insertionIndexInRightNode = insertionIndex - (rightMedian + 1)
+          
+          self.moveElements(
+            toHandle: handle,
+            fromIndex: rightMedian + 1,
+            toIndex: 0,
+            count: insertionIndexInRightNode
+          )
+          
+          self.moveElements(
+            toHandle: handle,
+            fromIndex: insertionIndex,
+            toIndex: insertionIndexInRightNode + 1,
+            count: self.numKeys - insertionIndex
+          )
+          
+          if !self.isLeaf {
+            self.moveChildren(
+              toHandle: handle,
+              fromIndex: rightMedian + 1,
+              toIndex: 0,
+              count: insertionIndex - rightMedian
+            )
+            
+            self.moveChildren(
+              toHandle: handle,
+              fromIndex: insertionIndex + 1,
+              toIndex: insertionIndexInRightNode + 1,
+              count: self.numChildren - (insertionIndex + 1)
+            )
+          }
+          
+          handle.insertElement(element, withRightChild: rightChild, at: insertionIndexInRightNode)
+          
+          handle.setElementCount(self.numKeys - rightMedian)
+          self.setElementCount(rightMedian)
+        }
       } else {
         // insertionIndex < rightMedian
+        splinterElement = self.moveElement(at: leftMedian)
         
         rightNode.update { handle in
-          self.moveElements(toHandle: handle, fromIndex: leftMedian + 1, toIndex: 0)
+          self.moveElements(
+            toHandle: handle,
+            fromIndex: leftMedian + 1,
+            toIndex: 0,
+            count: self.numKeys - (leftMedian + 1)
+          )
+          
+          self.moveElements(
+            toHandle: self,
+            fromIndex: insertionIndex,
+            toIndex: insertionIndex + 1,
+            count: leftMedian - insertionIndex
+          )
+          
+          if !self.isLeaf {
+            self.moveChildren(
+              toHandle: handle,
+              fromIndex: leftMedian + 1,
+              toIndex: 0,
+              count: self.numChildren - (leftMedian + 1)
+            )
+            
+            self.moveChildren(
+              toHandle: self,
+              fromIndex: insertionIndex + 1,
+              toIndex: insertionIndex + 2,
+              count: leftMedian - insertionIndex
+            )
+          }
+          
+          self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
+          
+          handle.setElementCount(self.numKeys - (leftMedian + 1))
+          self.setElementCount(leftMedian + 1)
         }
-        
-        splinterElement = self.moveElement(at: leftMedian)
-        self.setElementCount(leftMedian)
       }
       
       return _Node.Splinter(
@@ -408,13 +520,26 @@ extension _Node.UnsafeHandle {
       )
     } else {
       // Shift over elements near the insertion index.
-      self.moveWithNewElement(
-        element,
-        at: insertionIndex,
-        fromHandle: self,
+      let numElemsToShift = self.numKeys - insertionIndex
+      self.moveElements(
+        toHandle: self,
         fromIndex: insertionIndex,
-        toIndex: insertionIndex
+        toIndex: insertionIndex + 1,
+        count: numElemsToShift
       )
+      
+      if !self.isLeaf {
+        let numChildrenToShift = self.numChildren - insertionIndex - 1
+        self.moveChildren(
+          toHandle: self,
+          fromIndex: insertionIndex + 1,
+          toIndex: insertionIndex + 2,
+          count: numChildrenToShift
+        )
+      }
+      
+      self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
+      self.setElementCount(self.numKeys + 1)
       
       return nil
     }
@@ -426,19 +551,8 @@ extension _Node.UnsafeHandle {
   ///   - insertionIndex: The index of the child which produced the splinter
   /// - Returns: Another splinter which may need to be propogated upward
   @inlinable
-  internal func _insertSplinter(_ splinter: _Node.Splinter, at insertionIndex: Int) -> _Node.Splinter? {
-    assertMutable()
-    
-    let newSplinter = self._immediatelyInsertElement(splinter.median, at: insertionIndex)
-    if var newSplinter = newSplinter {
-      newSplinter.rightChild.update { handle in
-        handle[childAt: 0] = splinter.rightChild
-      }
-      return newSplinter
-    } else {
-      self[childAt: insertionIndex + 1] = splinter.rightChild
-      return nil
-    }
+  internal func immediatelyInsert(splinter: _Node.Splinter, at insertionIndex: Int) -> _Node.Splinter? {
+    return self.immediatelyInsert(element: splinter.median, withRightChild: splinter.rightChild, at: insertionIndex)
   }
   
   /// Inserts a value into this node or the appropriate child.
@@ -456,12 +570,12 @@ extension _Node.UnsafeHandle {
     // We need to try to insert as deep as possible as first, and have the splinter
     // bubble up.
     if self.isLeaf {
-      return self._immediatelyInsertElement(element, at: insertionIndex)
+      return self.immediatelyInsert(element: element, withRightChild: nil, at: insertionIndex)
     } else {
       let splinter = self[childAt: insertionIndex].update({ $0.insertElement(element) })
       
       if let splinter = splinter {
-        return self._insertSplinter(splinter, at: insertionIndex)
+        return self.immediatelyInsert(splinter: splinter, at: insertionIndex)
       }
       
       return nil

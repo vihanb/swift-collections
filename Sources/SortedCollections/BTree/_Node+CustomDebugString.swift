@@ -12,21 +12,6 @@
 extension _Node: CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
-    self.read { handle in
-      var result = "Node<\(Key.self), \(Value.self)>(["
-      var first = true
-      for index in 0..<handle.numKeys {
-        if first {
-          first = false
-        } else {
-          result += ", "
-        }
-        result += "("
-        debugPrint(handle.keys[index], terminator: ", ", to: &result)
-        debugPrint(handle.values[index], terminator: ")", to: &result)
-      }
-      result += "], \(self.children.debugDescription))"
-      return result
-    }
+    self.read { $0.debugDescription }
   }
 }

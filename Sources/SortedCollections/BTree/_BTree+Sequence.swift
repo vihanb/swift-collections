@@ -20,10 +20,10 @@ extension _BTree: Sequence {
     typealias Element = _BTree.Element
     
     /// This is a path refering to child offsets
-    private var currentCursor: Cursor?
+    private var currentCursor: Path?
     
     internal init(startingAt btree: _BTree) {
-      self.currentCursor = Cursor(firstElementOf: btree)
+      self.currentCursor = Path(firstElementOf: btree)
     }
     
     @usableFromInline

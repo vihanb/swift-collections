@@ -18,19 +18,22 @@ internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
   typealias Element = (key: Key, value: Value)
   
+  @usableFromInline
+  typealias Node = _Node<Key, Value>
+  
   /// The underlying node behind this local BTree
   @usableFromInline
-  internal var root: _Node<Key, Value>
+  internal var root: Node
   
   @inlinable
   @inline(__always)
   internal init() {
-    self.root = _Node(isLeaf: false, withCapacity: BTREE_NODE_CAPACITY)
+    self.root = Node(isLeaf: false, withCapacity: BTREE_NODE_CAPACITY)
   }
   
   @inlinable
   @inline(__always)
-  internal init(rootedAt root: _Node<Key, Value>) {
+  internal init(rootedAt root: Node) {
     self.root = root
   }
 }
@@ -41,8 +44,8 @@ extension _BTree {
   @inline(__always)
   internal mutating func insertKey(_ key: Key, withValue value: Value) {
     let element = (key: key, value: value)
-    if let splinter = root.update({ $0.insertElement(element) }) {
-      self.root = splinter.toNode(from: root, withCapacity: BTREE_NODE_CAPACITY)
+    if let splinter = self.root.update({ $0.insertElement(element) }) {
+      self.root = splinter.toNode(from: root, withCapacity: self.root.capacity)
     }
   }
 }
@@ -53,7 +56,7 @@ extension _BTree {
   /// - Returns: If found, returns a cursor to the element, or where
   ///     it would be if it did exist.
   @inlinable
-  internal func findFirstKey(_ key: Key) -> Cursor? {
+  internal func findFirstKey(_ key: Key) -> Path? {
     return nil
   }
 }

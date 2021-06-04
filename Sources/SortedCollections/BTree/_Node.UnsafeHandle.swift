@@ -206,8 +206,15 @@ extension _Node.UnsafeHandle {
   @inlinable
   @inline(__always)
   internal subscript(valueAt index: Int) -> Value {
-    assert(index < self.numValues, "Node values subscript out of bounds.")
-    return self.values[index]
+    get {
+      assert(index < self.numValues, "Node values subscript out of bounds.")
+      return self.values[index]
+    }
+    
+    nonmutating set(newValue) {
+      assert(index < self.numValues, "Node values subscript out of bounds.")
+      self.values[index] = newValue
+    }
   }
   
   // TODO: consider implementing `_modify` for these subscripts

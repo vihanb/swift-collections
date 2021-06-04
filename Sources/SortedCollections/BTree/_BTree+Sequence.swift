@@ -12,10 +12,7 @@
 
 extension _BTree: Sequence {
   @usableFromInline
-  typealias Iterator = NodeIterator
-  
-  @usableFromInline
-  internal struct NodeIterator: IteratorProtocol {
+  internal struct Iterator: IteratorProtocol {
     @usableFromInline
     typealias Element = _BTree.Element
     
@@ -27,7 +24,7 @@ extension _BTree: Sequence {
     }
     
     @usableFromInline
-    mutating func next() -> Element? {
+    internal mutating func next() -> Element? {
       guard let cursor = currentCursor else { return nil }
       defer { currentCursor = cursor.advanced() }
       return cursor.element
@@ -35,7 +32,7 @@ extension _BTree: Sequence {
   }
   
   @usableFromInline
-  internal func makeIterator() -> NodeIterator {
-    return NodeIterator(startingAt: self)
+  internal func makeIterator() -> Iterator {
+    return Iterator(startingAt: self)
   }
 }

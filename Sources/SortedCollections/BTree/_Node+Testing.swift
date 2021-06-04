@@ -31,4 +31,22 @@ extension _Node {
       handle.numValues = keyValuePairs.count
     }
   }
+  
+  /// Converts a node to a single array.
+  @_spi(Testing)
+  public func toArray() -> [Element] {
+    self.read { handle in
+      if handle.isLeaf {
+        return Array((0..<handle.numKeys).map { handle[elementAt: $0] })
+      } else {
+        var elements = [Element]()
+        for i in 0..<handle.numKeys {
+          elements.append(contentsOf: handle[childAt: i].toArray())
+          elements.append(handle[elementAt: i])
+        }
+        elements.append(contentsOf: handle[childAt: handle.numKeys].toArray())
+        return elements
+      }
+    }
+  }
 }

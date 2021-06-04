@@ -104,3 +104,13 @@ extension _Node {
     self.children?.ensureUnique(capacity: capacity + 1)
   }
 }
+
+// MARK: Equatable
+extension _Node: Equatable {
+  @usableFromInline
+  internal static func ==(lhs: _Node, rhs: _Node) -> Bool {
+    return lhs.keys.buffer.buffer === rhs.keys.buffer.buffer &&
+      lhs.values.buffer.buffer === rhs.values.buffer.buffer &&
+      lhs.children?.buffer.buffer === rhs.children?.buffer.buffer
+  }
+}

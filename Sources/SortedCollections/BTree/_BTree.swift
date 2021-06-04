@@ -62,6 +62,7 @@ extension _BTree {
   /// traverses the tree.
   @inlinable
   internal mutating func update(at path: Path, _ body: (Node.UnsafeHandle) -> Void) {
+    // TODO: get away from this recursion
     func update(_ handle: Node.UnsafeHandle, depth: Int) {
       if depth == path.offsets.count {
         body(handle)

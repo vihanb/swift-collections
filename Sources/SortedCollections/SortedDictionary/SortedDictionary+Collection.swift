@@ -34,26 +34,22 @@ extension SortedDictionary: Collection {
   
   @inlinable
   public func formIndex(after index: inout Index) {
-    index._assertValid()
-    precondition(index._root === self._root.root.storage,
-                 "Attempt to operate on invalid Dictionary index.")
-    
+    index._assertValid(for: self)
     self._root.formIndex(after: &index._index)
   }
   
   @inlinable
-  public func index(after i: Index) -> Index {
-    var newIndex = i
+  public func index(after index: Index) -> Index {
+    index._assertValid(for: self)
+    
+    var newIndex = index
     self.formIndex(after: &newIndex)
     return newIndex
   }
   
   @inlinable
   public subscript(position: Index) -> Element {
-    position._assertValid()
-    precondition(position._root === self._root.root.storage,
-                 "Attempting to access Dictionary elements using an invalid index.")
-    
+    position._assertValid(for: self)
     return self._root[position._index]
   }
 }

@@ -28,18 +28,31 @@ extension SortedDictionary {
     @usableFromInline
     internal weak var _root: _Tree.Node.Storage?
     
+    @usableFromInline
+    internal let _age: Int32
+    
     @inlinable
     @inline(__always)
     internal init(_index: _Tree.Index, forDictionary dictionary: SortedDictionary) {
       self._root = dictionary._root.root.storage
       self._index = _index
-      // TODO: add age property
+      self._age = dictionary._age
     }
     
-    /// Asserts the index is valid before proceeding
+   /// Asserts the index is valid for a given dictionary
     @inlinable
-    internal func _assertValid() {
-      precondition(self._root != nil, "Attempt to use an invalid SortedDictionary index.")
+    internal func _assertValid(for dictionary: SortedDictionary) {
+      precondition(
+        self._root === dictionary._root.root.storage && self._age == dictionary._age,
+        "Attempt to use an invalid SortedDictionary index.")
+    }
+    
+    /// Asserts that the index is valid for use with another index
+    @inlinable
+    internal func _assertValid(with index: Index) {
+      precondition(
+        self._root != nil && self._root === index._root,
+        "Attempt to use an invalid SortedDictionary index.")
     }
   }
 }
@@ -48,9 +61,7 @@ extension SortedDictionary {
 extension SortedDictionary.Index: Equatable {
   // TODO: Potentially validate if lhs & rhs aren't pointing to deallocated dictionaries.
   public static func ==(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
-    lhs._assertValid()
-    rhs._assertValid()
-    precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
+    lhs._assertValid(with: rhs)
     return lhs._index == rhs._index
   }
 }
@@ -58,9 +69,7 @@ extension SortedDictionary.Index: Equatable {
 // MARK: Comparable
 extension SortedDictionary.Index: Comparable {
   public static func <(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
-    lhs._assertValid()
-    rhs._assertValid()
-    precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
+    lhs._assertValid(with: rhs)
     return lhs._index < rhs._index
   }
 }

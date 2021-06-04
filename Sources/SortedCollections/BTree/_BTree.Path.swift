@@ -84,7 +84,7 @@ extension _BTree {
 extension _BTree.Path: Equatable {
   /// Returns true if two paths are identical (point to the same node).
   /// - Precondition: expects both paths are from the same BTree.
-  /// - Complexity: O(`min(1)`)
+  /// - Complexity: O(1)
   @inlinable
   public static func ==(lhs: _BTree.Path, rhs: _BTree.Path) -> Bool {
     // We assume the parents are the same
@@ -95,6 +95,7 @@ extension _BTree.Path: Equatable {
 // MARK: Comparable
 extension _BTree.Path: Comparable {
   /// Returns true if the first path points to an element before the second path
+  /// - Complexity: O(`log n`)
   @inlinable
   public static func <(lhs: _BTree.Path, rhs: _BTree.Path) -> Bool {
     for i in 0..<min(lhs.offsets.count, rhs.offsets.count) {

@@ -45,6 +45,7 @@ extension _BTree: Collection {
   }
   
   /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
+  /// - Complexity: O(`log n`)
   @inlinable
   internal var startIndex: Index {
     if self.root.read({ $0.numElements }) == 0 {
@@ -64,6 +65,7 @@ extension _BTree: Collection {
   }
   
   /// Returns a sentinel value for the last element
+  /// - Complexity: O(1)
   @inlinable
   internal var endIndex: Index { return Index(nil) }
   

@@ -20,6 +20,12 @@ public struct SortedDictionary<Key: Comparable, Value> {
   @usableFromInline
   internal var _root: _Tree
   
+  /// A metric to uniquely identify a sorted dictionary's state. It is not
+  /// impossible for two dictionaries to have the same age by pure
+  /// coincidence.
+  @usableFromInline
+  internal var _age: Int32
+  
   /// Creates an empty dictionary.
   /// 
   /// - Complexity: O(1)
@@ -27,12 +33,14 @@ public struct SortedDictionary<Key: Comparable, Value> {
   @inline(__always)
   public init() {
     self._root = _Tree()
+    self._age = Int32(truncatingIfNeeded: ObjectIdentifier(self._root.root.storage).hashValue)
   }
   
   /// Creates a dictionary rooted at a given BTree.
   @inlinable
   internal init(_rootedAt tree: _Tree) {
     self._root = tree
+    self._age = Int32(truncatingIfNeeded: ObjectIdentifier(self._root.root.storage).hashValue)
   }
   
   /// Creates a dictionary from a sequence of key-value pairs which must
@@ -50,6 +58,13 @@ public struct SortedDictionary<Key: Comparable, Value> {
       self._root.insertKey(key, withValue: value)
     }
   }
+  
+  /// Invalidates the issued indices of the dictionary. Ensure this is
+  /// called for operations which mutate the SortedDictionary.
+  @inlinable
+  internal mutating func _invalidateIndices() {
+    self._age &+= 1
+  }
 }
 
 // MARK: Subscripts
@@ -64,6 +79,8 @@ extension SortedDictionary {
     }
     
     set {
+      self._invalidateIndices()
+      
       let path = self._root.findFirstKey(key)
       switch (newValue, path) {
       case let (newValue?, path?): // Assignment

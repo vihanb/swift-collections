@@ -29,6 +29,12 @@ public struct SortedDictionary<Key: Comparable, Value> {
     self._root = _Tree()
   }
   
+  /// Creates a dictionary rooted at a given BTree.
+  @inlinable
+  internal init(_rootedAt tree: _Tree) {
+    self._root = tree
+  }
+  
   /// Creates a dictionary from a sequence of key-value pairs which must
   /// be unique.
   /// - Complexity: O(`n log n`)

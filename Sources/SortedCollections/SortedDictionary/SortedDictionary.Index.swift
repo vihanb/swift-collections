@@ -14,7 +14,7 @@ extension SortedDictionary {
   /// - Complexity: O(`log n`)
   public func index(forKey key: Key) -> Index? {
     if let path = self._root.findFirstKey(key) {
-      return Index(_path: path, forDictionary: self)
+      return Index(_index: _Tree.Index(path), forDictionary: self)
     } else {
       return nil
     }
@@ -23,43 +23,44 @@ extension SortedDictionary {
   /// The position of an element within a sorted dictionary
   public struct Index {
     @usableFromInline
-    internal let _path: _Tree.Path?
+    internal var _index: _Tree.Index
     
     @usableFromInline
     internal weak var _root: _Tree.Node.Storage?
     
     @inlinable
-    internal init(_path: _Tree.Path?, forDictionary dictionary: SortedDictionary) {
+    @inline(__always)
+    internal init(_index: _Tree.Index, forDictionary dictionary: SortedDictionary) {
       self._root = dictionary._root.root.storage
-      self._path = _path
+      self._index = _index
+      // TODO: add age property
+    }
+    
+    /// Asserts the index is valid before proceeding
+    @inlinable
+    internal func _assertValid() {
+      precondition(self._root != nil, "Attempt to use an invalid SortedDictionary index.")
     }
   }
 }
 
 // MARK: Equatable
 extension SortedDictionary.Index: Equatable {
+  // TODO: Potentially validate if lhs & rhs aren't pointing to deallocated dictionaries.
   public static func ==(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
+    lhs._assertValid()
+    rhs._assertValid()
     precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
-    return lhs._path == rhs._path
+    return lhs._index == rhs._index
   }
 }
 
 // MARK: Comparable
 extension SortedDictionary.Index: Comparable {
   public static func <(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
+    lhs._assertValid()
+    rhs._assertValid()
     precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
-    
-    // TODO: if branch prediction does not do well here, potentially change to
-    // branch with explicit _fastPath
-    switch (lhs._path, rhs._path) {
-    case let (lhsPath?, rhsPath?):
-      return lhsPath < rhsPath
-    case (_?, nil):
-      return true
-    case (nil, _?):
-      return false
-    case (nil, nil):
-      return false
-    }
+    return lhs._index < rhs._index
   }
 }

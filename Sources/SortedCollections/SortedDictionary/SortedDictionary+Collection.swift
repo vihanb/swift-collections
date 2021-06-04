@@ -15,8 +15,9 @@ extension SortedDictionary: Collection {
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   ///
   /// - Complexity: O(`log n`)
+  @inlinable
   public var startIndex: Index {
-    Index(_path: self._root.startIndex, forDictionary: self)
+    Index(_index: self._root.startIndex, forDictionary: self)
   }
   
   /// The dictionary's "past the end" position---that is, the position one
@@ -25,21 +26,34 @@ extension SortedDictionary: Collection {
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
   ///
   /// - Complexity: O(1)
+  @inlinable
   public var endIndex: Index {
-    Index(_path: self._root.endIndex, forDictionary: self)
+    Index(_index: self._root.endIndex, forDictionary: self)
   }
   
-  public func index(after index: Index) -> Index {
-    guard let path = index._path, index._root === self._root.root.storage else {
-      preconditionFailure("Attempt to operate on invalid Dictionary index.")
-    }
+  
+  @inlinable
+  public func formIndex(after index: inout Index) {
+    index._assertValid()
+    precondition(index._root === self._root.root.storage,
+                 "Attempt to operate on invalid Dictionary index.")
     
-    return Index(_path: self._root.index(after: path), forDictionary: self)
+    self._root.formIndex(after: &index._index)
   }
   
+  @inlinable
+  public func index(after i: Index) -> Index {
+    var newIndex = i
+    self.formIndex(after: &newIndex)
+    return newIndex
+  }
+  
+  @inlinable
   public subscript(position: Index) -> Element {
-    precondition(position._root === self._root.root.storage && position._path != nil,
+    position._assertValid()
+    precondition(position._root === self._root.root.storage,
                  "Attempting to access Dictionary elements using an invalid index.")
-    return position._path!.element
+    
+    return self._root[position._index]
   }
 }

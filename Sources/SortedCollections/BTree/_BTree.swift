@@ -11,7 +11,7 @@
 
 // Totally arbitrary node capacity for BTree
 @usableFromInline
-internal let BTREE_NODE_CAPACITY = 100
+internal let BTREE_NODE_CAPACITY = 3
 
 @usableFromInline
 internal struct _BTree<Key: Comparable, Value> {
@@ -32,7 +32,7 @@ internal struct _BTree<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   internal init(capacity: Int = BTREE_NODE_CAPACITY) {
-    self.root = Node(withCapacity: capacity, isLeaf: false)
+    self.root = Node(withCapacity: capacity, isLeaf: true)
     self.capacity = capacity
   }
   
@@ -56,93 +56,22 @@ extension _BTree {
   }
 }
 
-// MARK: Path Operations
-extension _BTree: Collection {
-  /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
-  @inlinable
-  internal var startIndex: Path? {
-    if self.root.read({ $0.numElements }) == 0 {
-      return nil
-    }
-    
-    var depth = 0
-    var node: Node = self.root
-    
-    while node.read({ $0.numChildren }) > 0 {
-      node = node.read { $0[childAt: 0] }
-      depth += 1
-    }
-    
-    let offsets = [Int](repeating: 0, count: depth)
-    return Path(node: self.root, slot: 0, offsets: offsets)
-  }
-  
-  /// Returns a sentinel value for the last element
-  @inlinable
-  internal var endIndex: Path? { return nil }
-  
-  @inlinable
-  internal func index(after index: Path?) -> Path? {
-    return nil
-  }
-  
-  @inlinable
-  internal subscript(index: Path?) -> Element {
-    return index!.element
-  }
-  
-  /// Returns a path to the first key that is equal to given key.
-  /// - Returns: If found, returns a cursor to the element.
-  @inlinable
-  internal func findFirstKey(_ key: Key) -> Path? {
-    var offsets = [Int]()
-    var node: Node? = self.root
-    
-    while let currentNode = node {
-      let path: Path? = currentNode.read { handle in
-        let keyIndex = handle.firstIndex(of: key)
-        if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
-          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets)
-        } else {
-          if handle.isLeaf {
-            node = nil
-          } else {
-            offsets.append(keyIndex)
-            node = handle[childAt: keyIndex]
-          }
-          
-          return nil
-        }
-      }
-      
-      if let path = path {
-        return path
-      }
-    }
-    
-    return nil
-  }
-}
-
 // MARK: Write Operations
 extension _BTree {
   /// Updates a B-Tree at a specific path, running uniqueness checks as it
   /// traverses the tree.
   @inlinable
   internal mutating func update(at path: Path, _ body: (Node.UnsafeHandle) -> Void) {
-    var node = path.node
-    node.update { body($0) }
-    
-    // Write back node to its parent and so on.
-    for parent in path.parents.reversed() {
-      var parentNode = parent.node
-      parentNode.update { handle in
-        handle[childAt: parent.offset] = node
+    func update(_ handle: Node.UnsafeHandle, depth: Int) {
+      if depth == path.offsets.count {
+        body(handle)
+      } else {
+        let offset = path.offsets[depth]
+        handle[childAt: offset].update { update($0, depth: depth + 1) }
       }
-      node = parentNode
     }
     
-    self.root = node
+    self.root.update { update($0, depth: 0) }
   }
   
   /// Updates the corresponding value for a key in the tree.

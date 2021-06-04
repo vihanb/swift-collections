@@ -96,7 +96,10 @@ final class NodeTests: CollectionTestCase {
           insertSortedValue(newKey, into: &array)
           
           expectNil(splinter)
-          expectEqualElements(node.keys, array)
+          node.read { handle in
+            let keys = UnsafeBufferPointer(start: handle.keys, count: handle.numElements)
+            expectEqualElements(keys, array)
+          }
         }
       }
     }

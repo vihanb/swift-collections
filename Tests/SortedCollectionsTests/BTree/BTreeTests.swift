@@ -144,6 +144,6 @@ final class BTreeTests: CollectionTestCase {
     }
     
     let btreeElems = Array(btree)
-    expectEqualElements(btreeElems, btree.root.toArray())
+//    expectEqualElements(btreeElems, btree.root.toArray())
   }
 }

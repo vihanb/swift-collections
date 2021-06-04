@@ -25,16 +25,22 @@ internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
   internal var root: Node
   
+  // TODO: remove
+  @usableFromInline
+  internal var capacity: Int
+  
   @inlinable
   @inline(__always)
   internal init(capacity: Int = BTREE_NODE_CAPACITY) {
-    self.root = Node(isLeaf: false, withCapacity: capacity)
+    self.root = Node(withCapacity: capacity, isLeaf: false)
+    self.capacity = capacity
   }
   
   @inlinable
   @inline(__always)
-  internal init(rootedAt root: Node) {
+  internal init(rootedAt root: Node, capacity: Int = BTREE_NODE_CAPACITY) {
     self.root = root
+    self.capacity = capacity
   }
 }
 
@@ -45,31 +51,63 @@ extension _BTree {
   internal mutating func insertKey(_ key: Key, withValue value: Value) {
     let element = (key: key, value: value)
     if let splinter = self.root.update({ $0.insertElement(element) }) {
-      self.root = splinter.toNode(from: root, withCapacity: self.root.capacity)
+      self.root = splinter.toNode(from: root, withCapacity: self.capacity)
     }
   }
 }
 
-// MARK: Read Operations
-extension _BTree {
-  /// Returns a cursor to the first key that is equal to given key.
-  /// - Returns: If found, returns a cursor to the element, or where
-  ///     it would be if it did exist.
+// MARK: Path Operations
+extension _BTree: Collection {
+  /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
+  @inlinable
+  internal var startIndex: Path? {
+    if self.root.read({ $0.numElements }) == 0 {
+      return nil
+    }
+    
+    var depth = 0
+    var node: Node = self.root
+    
+    while node.read({ $0.numChildren }) > 0 {
+      node = node.read { $0[childAt: 0] }
+      depth += 1
+    }
+    
+    let offsets = [Int](repeating: 0, count: depth)
+    return Path(node: self.root, slot: 0, offsets: offsets)
+  }
+  
+  /// Returns a sentinel value for the last element
+  @inlinable
+  internal var endIndex: Path? { return nil }
+  
+  @inlinable
+  internal func index(after index: Path?) -> Path? {
+    return nil
+  }
+  
+  @inlinable
+  internal subscript(index: Path?) -> Element {
+    return index!.element
+  }
+  
+  /// Returns a path to the first key that is equal to given key.
+  /// - Returns: If found, returns a cursor to the element.
   @inlinable
   internal func findFirstKey(_ key: Key) -> Path? {
-    var parents = [Path.ChildNode]()
+    var offsets = [Int]()
     var node: Node? = self.root
     
     while let currentNode = node {
       let path: Path? = currentNode.read { handle in
         let keyIndex = handle.firstIndex(of: key)
-        if keyIndex < handle.numKeys && handle[keyAt: keyIndex] == key {
-          return Path(node: currentNode, slot: keyIndex, parents: parents)
+        if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
+          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets)
         } else {
           if handle.isLeaf {
             node = nil
           } else {
-            parents.append((node: currentNode, offset: keyIndex))
+            offsets.append(keyIndex)
             node = handle[childAt: keyIndex]
           }
           

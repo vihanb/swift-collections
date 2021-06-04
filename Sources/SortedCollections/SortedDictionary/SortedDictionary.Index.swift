@@ -14,7 +14,7 @@ extension SortedDictionary {
   /// - Complexity: O(`log n`)
   public func index(forKey key: Key) -> Index? {
     if let path = self._root.findFirstKey(key) {
-      return Index(_path: path)
+      return Index(_path: path, forDictionary: self)
     } else {
       return nil
     }
@@ -22,10 +22,15 @@ extension SortedDictionary {
   
   /// The position of an element within a sorted dictionary
   public struct Index {
-    // TODO: invalidation of sorts
+    @usableFromInline
     internal let _path: _Tree.Path?
     
-    internal init(_path: _Tree.Path?) {
+    @usableFromInline
+    internal weak var _root: _Tree.Node.Storage?
+    
+    @inlinable
+    internal init(_path: _Tree.Path?, forDictionary dictionary: SortedDictionary) {
+      self._root = dictionary._root.root.storage
       self._path = _path
     }
   }
@@ -34,7 +39,7 @@ extension SortedDictionary {
 // MARK: Equatable
 extension SortedDictionary.Index: Equatable {
   public static func ==(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
-    // TODO: ensure referring to the same collection
+    precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
     return lhs._path == rhs._path
   }
 }
@@ -42,6 +47,8 @@ extension SortedDictionary.Index: Equatable {
 // MARK: Comparable
 extension SortedDictionary.Index: Comparable {
   public static func <(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
+    precondition(lhs._root === rhs._root, "Comparing indexes from different dictionaries.")
+    
     // TODO: if branch prediction does not do well here, potentially change to
     // branch with explicit _fastPath
     switch (lhs._path, rhs._path) {

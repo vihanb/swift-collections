@@ -24,16 +24,15 @@ extension _Node {
     @inlinable
     @inline(__always)
     internal func toNode(from node: _Node<Key, Value>, withCapacity capacity: Int) -> _Node {
-      var newNode = _Node(isLeaf: false, withCapacity: capacity)
+      var newNode = _Node(withCapacity: capacity, isLeaf: false)
       newNode.update { handle in
         handle.keys.initialize(to: median.key)
         handle.values.initialize(to: median.value)
-        handle.numKeys = 1
-        handle.numValues = 1
         
         handle.children!.initialize(to: node)
         handle.children!.advanced(by: 1).initialize(to: self.rightChild)
-        handle.numChildren = 2
+        
+        handle.numElements = 1
       }
       return newNode
     }

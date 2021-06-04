@@ -19,7 +19,11 @@ extension _BTree: Sequence {
     /// This is a path refering to child offsets
     private var currentCursor: Path?
     
+    /// Strong reference to the BTree to preserve it during iteratino.
+    private let tree: _BTree
+    
     internal init(startingAt btree: _BTree) {
+      self.tree = btree
       self.currentCursor = Path(firstElementOf: btree)
     }
     

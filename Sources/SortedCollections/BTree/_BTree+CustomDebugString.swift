@@ -51,16 +51,16 @@ extension _BTree: CustomDebugStringConvertible {
   private func describeNode(_ node: _Node<Key, Value>) -> String {
     node.read { handle in
       var result = ""
-      for index in 0..<handle.numKeys {
+      for index in 0..<handle.numElements {
         if !handle.isLeaf {
           let childDescription = indentDescription(describeNode(handle[childAt: index]), position: index == 0 ? .start : .middle)
           result += childDescription + "\n"
         }
         
         if handle.isLeaf {
-          if handle.numKeys == 1 {
+          if handle.numElements == 1 {
             result += "╺━ "
-          } else if index == handle.numKeys - 1 {
+          } else if index == handle.numElements - 1 {
             result += "┗━ "
           } else if index == 0 {
             result += "┏━ "
@@ -74,7 +74,7 @@ extension _BTree: CustomDebugStringConvertible {
         debugPrint(handle[keyAt: index], terminator: ": ", to: &result)
         debugPrint(handle[valueAt: index], terminator: "", to: &result)
         
-        if !handle.isLeaf && index == handle.numKeys - 1 {
+        if !handle.isLeaf && index == handle.numElements - 1 {
           let childDescription = indentDescription(describeNode(handle[childAt: index + 1]), position: .end)
           result += "\n" + childDescription
         }

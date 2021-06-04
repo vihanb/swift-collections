@@ -17,7 +17,7 @@ extension _Node {
     capacity: Int
   ) where C.Element == Element {
     precondition(keyValuePairs.count <= capacity, "Too many key-value pairs.")
-    self.init(isLeaf: true, withCapacity: capacity)
+    self.init(withCapacity: capacity, isLeaf: true)
     
     self.update { handle in
       let sortedKeyValuePairs = keyValuePairs.sorted(by: { $0.key < $1.key })
@@ -27,8 +27,7 @@ extension _Node {
         handle.keys.advanced(by: index).initialize(to: key)
         handle.values.advanced(by: index).initialize(to: value)
       }
-      handle.numKeys = keyValuePairs.count
-      handle.numValues = keyValuePairs.count
+      handle.numElements = keyValuePairs.count
     }
   }
   
@@ -37,14 +36,14 @@ extension _Node {
   public func toArray() -> [Element] {
     self.read { handle in
       if handle.isLeaf {
-        return Array((0..<handle.numKeys).map { handle[elementAt: $0] })
+        return Array((0..<handle.numElements).map { handle[elementAt: $0] })
       } else {
         var elements = [Element]()
-        for i in 0..<handle.numKeys {
+        for i in 0..<handle.numElements {
           elements.append(contentsOf: handle[childAt: i].toArray())
           elements.append(handle[elementAt: i])
         }
-        elements.append(contentsOf: handle[childAt: handle.numKeys].toArray())
+        elements.append(contentsOf: handle[childAt: handle.numElements].toArray())
         return elements
       }
     }

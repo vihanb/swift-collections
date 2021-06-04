@@ -13,13 +13,7 @@ extension _Node {
   @usableFromInline
   internal struct UnsafeHandle {
     @usableFromInline
-    internal let keyHeader: UnsafeMutablePointer<BufferHeader>
-    
-    @usableFromInline
-    internal let valueHeader: UnsafeMutablePointer<BufferHeader>
-    
-    @usableFromInline
-    internal let childrenHeader: UnsafeMutablePointer<BufferHeader>?
+    internal let header: UnsafeMutablePointer<Header>
     
     @usableFromInline
     internal let keys: UnsafeMutablePointer<Key>
@@ -30,28 +24,19 @@ extension _Node {
     @usableFromInline
     internal let children: UnsafeMutablePointer<_Node<Key, Value>>?
     
-    @usableFromInline
-    internal let capacity: Int
-    
     @inlinable
     @inline(__always)
     internal init(
-      keyHeader: UnsafeMutablePointer<BufferHeader>,
-      valueHeader: UnsafeMutablePointer<BufferHeader>,
-      childrenHeader: UnsafeMutablePointer<BufferHeader>?,
       keys: UnsafeMutablePointer<Key>,
       values: UnsafeMutablePointer<Value>,
       children: UnsafeMutablePointer<_Node<Key, Value>>?,
-      capacity: Int,
+      header: UnsafeMutablePointer<Header>,
       isMutable: Bool
     ) {
-      self.keyHeader = keyHeader
-      self.valueHeader = valueHeader
-      self.childrenHeader = childrenHeader
       self.keys = keys
       self.values = values
       self.children = children
-      self.capacity = capacity
+      self.header = header
       
       #if COLLECTIONS_INTERNAL_CHECKS
       self.isMutable = isMutable
@@ -82,11 +67,11 @@ extension _Node {
     @inline(never)
     @usableFromInline
     internal func checkInvariants() {
-      assert(isLeaf || numChildren == numKeys + 1, "Node must have either zero children or a child on the side of each key.")
-      assert(numKeys == numKeys, "Node must have equal count of keys and values ")
+      assert(isLeaf || numChildren == numElements + 1, "Node must have either zero children or a child on the side of each key.")
+      assert(numElements == numElements, "Node must have equal count of keys and values ")
       
-      if numKeys > 1 {
-        for i in 0..<(numKeys - 1) {
+      if numElements > 1 {
+        for i in 0..<(numElements - 1) {
           precondition(self[keyAt: i] <= self[keyAt: i + 1], "Node is out-of-order.")
         }
       }
@@ -102,13 +87,10 @@ extension _Node {
     @inline(__always)
     internal init(mutableCopyOf handle: UnsafeHandle) {
       self.init(
-        keyHeader: handle.keyHeader,
-        valueHeader: handle.valueHeader,
-        childrenHeader: handle.childrenHeader,
         keys: handle.keys,
         values: handle.values,
         children: handle.children,
-        capacity: handle.capacity,
+        header: handle.header,
         isMutable: true
       )
     }
@@ -116,35 +98,23 @@ extension _Node {
     // MARK: Convenience properties
     @inlinable
     @inline(__always)
-    internal var numKeys: Int {
-      get { keyHeader.pointee.count }
-      nonmutating set { assertMutable(); keyHeader.pointee.count = newValue }
+    internal var capacity: Int { header.pointee.capacity }
+    
+    @inlinable
+    @inline(__always)
+    internal var numElements: Int {
+      get { header.pointee.count }
+      nonmutating set { assertMutable(); header.pointee.count = newValue }
     }
     
     @inlinable
     @inline(__always)
-    internal var numValues: Int {
-      get { valueHeader.pointee.count }
-      nonmutating set { assertMutable(); valueHeader.pointee.count = newValue }
-    }
-    
-    // TODO: potentially optimize to defining as numKeys + 1
-    @inlinable
-    @inline(__always)
-    internal var numChildren: Int {
-      get { childrenHeader?.pointee.count ?? 0 }
-      nonmutating set {
-        assertMutable()
-        assert(!isLeaf || newValue != 0, "Cannot set non-zero number of children on a leaf")
-        // TODO: unwrap overhead?
-        childrenHeader!.pointee.count = newValue
-      }
-    }
+    internal var numChildren: Int { self.isLeaf ? 0 : self.numElements + 1 }
     
     // TODO: determine whether this is true or false more often than not.
     @inlinable
     @inline(__always)
-    internal var isLeaf: Bool { childrenHeader == nil }
+    internal var isLeaf: Bool { children == nil }
   }
 }
 
@@ -154,7 +124,7 @@ extension _Node.UnsafeHandle: CustomDebugStringConvertible {
   public var debugDescription: String {
     var result = "Node<\(Key.self), \(Value.self)>(["
     var first = true
-    for index in 0..<self.numKeys {
+    for index in 0..<self.numElements {
       if first {
         first = false
       } else {
@@ -181,13 +151,13 @@ extension _Node.UnsafeHandle {
   @inline(__always)
   internal subscript(elementAt index: Int) -> _Node.Element {
     get {
-      assert(index < self.numKeys, "Node element subscript out of bounds.")
+      assert(index < self.numElements, "Node element subscript out of bounds.")
       return (key: self.keys[index], value: self.values[index])
     }
     
     nonmutating set(newElement) {
       assertMutable()
-      assert(index < self.numKeys, "Node element subscript out of bounds.")
+      assert(index < self.numElements, "Node element subscript out of bounds.")
       
       // TODO: ensure that the subscript does deintialize the old
       // element
@@ -199,20 +169,27 @@ extension _Node.UnsafeHandle {
   @inlinable
   @inline(__always)
   internal subscript(keyAt index: Int) -> Key {
-    assert(index < self.numKeys, "Node key subscript out of bounds.")
-    return self.keys[index]
+    get {
+      assert(index < self.numElements, "Node key subscript out of bounds.")
+      return self.keys[index]
+    }
+    
+    nonmutating set(newValue) {
+      assert(index < self.numElements, "Node key subscript out of bounds.")
+      self.keys[index] = newValue
+    }
   }
   
   @inlinable
   @inline(__always)
   internal subscript(valueAt index: Int) -> Value {
     get {
-      assert(index < self.numValues, "Node values subscript out of bounds.")
+      assert(index < self.numElements, "Node values subscript out of bounds.")
       return self.values[index]
     }
     
     nonmutating set(newValue) {
-      assert(index < self.numValues, "Node values subscript out of bounds.")
+      assert(index < self.numElements, "Node values subscript out of bounds.")
       self.values[index] = newValue
     }
   }
@@ -243,7 +220,7 @@ extension _Node.UnsafeHandle {
   @usableFromInline
   internal func firstIndex(of key: Key) -> Int {
     var start: Int = 0
-    var end: Int = self.numKeys
+    var end: Int = self.numElements
     
     while end > start {
       let mid = (end - start) / 2 + start
@@ -263,7 +240,7 @@ extension _Node.UnsafeHandle {
   @usableFromInline
   internal func lastIndex(of key: Key) -> Int {
     var start: Int = 0
-    var end: Int = self.numKeys
+    var end: Int = self.numElements
     
     while end > start {
       let mid = (end - start) / 2 + start
@@ -372,28 +349,12 @@ extension _Node.UnsafeHandle {
   @inline(__always)
   internal func moveElement(at index: Int) -> _Node.Element {
     assertMutable()
-    assert(index < self.numKeys, "Attempted to move out-of-bounds element.")
+    assert(index < self.numElements, "Attempted to move out-of-bounds element.")
     
     return (
       key: self.keys.advanced(by: index).move(),
       value: self.values.advanced(by: index).move()
     )
-  }
-  
-  /// Sets the number of elements in this node. Also updates children count
-  /// if a non-leaf node.
-  @inlinable
-  @inline(__always)
-  internal func setElementCount(_ numElements: Int) {
-    assertMutable()
-    assert(numElements <= self.capacity, "Cannot set more elements than capacity.")
-    
-    self.numKeys = numElements
-    self.numValues = numElements
-    
-    if !self.isLeaf {
-      self.numChildren = numElements + 1
-    }
   }
 }
 
@@ -411,19 +372,19 @@ extension _Node.UnsafeHandle {
     assert(self.isLeaf == (rightChild == nil), "A child can only be inserted iff the node is a leaf.")
     
     // If we have a full B-Tree, we'll need to splinter
-    if self.numKeys == self.capacity {
+    if self.numElements == self.capacity {
       // Right median == left median for BTrees with odd capacity
-      let rightMedian = self.numKeys / 2
-      let leftMedian = (self.numKeys - 1) / 2
+      let rightMedian = self.numElements / 2
+      let leftMedian = (self.numElements - 1) / 2
       
       var splinterElement: _Node.Element
-      var rightNode = _Node(isLeaf: self.isLeaf, withCapacity: self.capacity)
+      var rightNode = _Node(withCapacity: self.capacity, isLeaf: self.isLeaf)
       
       if insertionIndex == rightMedian {
         splinterElement = element
         
         let numLeftElements = rightMedian
-        let numRightElements = self.numKeys - rightMedian
+        let numRightElements = self.numElements - rightMedian
         
         rightNode.update { handle in
           self.moveElements(toHandle: handle, fromIndex: rightMedian, toIndex: 0, count: numRightElements)
@@ -435,8 +396,8 @@ extension _Node.UnsafeHandle {
             self.moveChildren(toHandle: handle, fromIndex: rightMedian + 1, toIndex: 1, count: numRightElements)
           }
           
-          self.setElementCount(numLeftElements)
-          handle.setElementCount(numRightElements)
+          self.numElements = numLeftElements
+          handle.numElements = numRightElements
         }
       } else if insertionIndex > rightMedian {
         splinterElement = self.moveElement(at: rightMedian)
@@ -455,7 +416,7 @@ extension _Node.UnsafeHandle {
             toHandle: handle,
             fromIndex: insertionIndex,
             toIndex: insertionIndexInRightNode + 1,
-            count: self.numKeys - insertionIndex
+            count: self.numElements - insertionIndex
           )
           
           if !self.isLeaf {
@@ -476,8 +437,8 @@ extension _Node.UnsafeHandle {
           
           handle.insertElement(element, withRightChild: rightChild, at: insertionIndexInRightNode)
           
-          handle.setElementCount(self.numKeys - rightMedian)
-          self.setElementCount(rightMedian)
+          handle.numElements = self.numElements - rightMedian
+          self.numElements = rightMedian
         }
       } else {
         // insertionIndex < rightMedian
@@ -488,7 +449,7 @@ extension _Node.UnsafeHandle {
             toHandle: handle,
             fromIndex: leftMedian + 1,
             toIndex: 0,
-            count: self.numKeys - (leftMedian + 1)
+            count: self.numElements - (leftMedian + 1)
           )
           
           self.moveElements(
@@ -516,8 +477,8 @@ extension _Node.UnsafeHandle {
           
           self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
           
-          handle.setElementCount(self.numKeys - (leftMedian + 1))
-          self.setElementCount(leftMedian + 1)
+          handle.numElements = self.numElements - (leftMedian + 1)
+          self.numElements = leftMedian + 1
         }
       }
       
@@ -527,7 +488,7 @@ extension _Node.UnsafeHandle {
       )
     } else {
       // Shift over elements near the insertion index.
-      let numElemsToShift = self.numKeys - insertionIndex
+      let numElemsToShift = self.numElements - insertionIndex
       self.moveElements(
         toHandle: self,
         fromIndex: insertionIndex,
@@ -546,7 +507,7 @@ extension _Node.UnsafeHandle {
       }
       
       self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
-      self.setElementCount(self.numKeys + 1)
+      self.numElements = numElements + 1
       
       return nil
     }

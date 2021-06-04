@@ -12,22 +12,13 @@
 extension _Node {
   @usableFromInline
   internal struct BufferHeader {
-    @usableFromInline
-    internal var count: Int
-    
-    @usableFromInline
-    init(count: Int) {
-      self.count = count
-    }
+    @inlinable
+    @inline(__always)
+    internal init() {}
   }
   
+  /// Represents a contiguous sequence of elements.
+  /// - Warning: does not deallocate itself.
   @usableFromInline
-  internal class Buffer<Element>: ManagedBuffer<BufferHeader, Element> {
-    @inlinable
-    deinit {
-      _ = self.withUnsafeMutablePointers { header, elements in
-        elements.deinitialize(count: header.pointee.count)
-      }
-    }
-  }
+  typealias Buffer<Element> = ManagedBuffer<BufferHeader, Element>
 }

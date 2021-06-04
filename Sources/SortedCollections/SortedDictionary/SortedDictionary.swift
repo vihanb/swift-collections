@@ -49,6 +49,8 @@ public struct SortedDictionary<Key: Comparable, Value> {
 // MARK: Subscripts
 extension SortedDictionary {
   /// Accesses the value associated with the key for both read and write operations
+  /// - Complexity: O(`log n`)
+  @inlinable
   public subscript(key: Key) -> Value? {
     get {
       let path = self._root.findFirstKey(key)
@@ -67,6 +69,21 @@ extension SortedDictionary {
       case (nil, nil): // Noop
         break 
       }
+    }
+  }
+  
+  /// Accesses the value associated with the key for both read and write operations.
+  /// If the key does not exist in the dictionary, this returns a default value.
+  @inlinable
+  public subscript(
+    key: Key, default defaultValue: @autoclosure () -> Value
+  ) -> Value {
+    get {
+      return self[key] ?? defaultValue()
+    }
+    
+    set {
+      self[key] = newValue
     }
   }
 }

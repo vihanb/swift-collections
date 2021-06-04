@@ -11,105 +11,58 @@
 
 extension _Node {
   @usableFromInline
-  internal struct Storage<Element> {
-    @usableFromInline
-    typealias Buffer = _Node.Buffer<Element>
-    
-    @usableFromInline
-    typealias BufferHeader = _Node.BufferHeader
-    
-    @usableFromInline
-    typealias Pointer = ManagedBufferPointer<BufferHeader, Element>
-    
-    @usableFromInline
-    internal var buffer: Pointer
-    
+  internal struct Header {
     @inlinable
-    @inline(__always)
-    internal init(buffer: Pointer) {
-      self.buffer = buffer
-    }
-  }
-}
-
-// MARK: Convenience initializers
-extension _Node.Storage {
-  @inlinable
-  @inline(__always)
-  internal init(capacity: Int, count: Int = 0) {
-    let buffer = Buffer.create(minimumCapacity: capacity) { _ in
-      BufferHeader(count: count)
+    internal init(
+      capacity: Int,
+      count: Int,
+      values: _Node<Key, Value>.Buffer<Value>,
+      children: _Node<Key, Value>.Buffer<_Node<Key, Value>>?
+    ) {
+      self.capacity = capacity
+      self.count = count
+      self.values = values
+      self.children = children
     }
     
-    self.init(buffer: Pointer(unsafeBufferObject: buffer))
+    @usableFromInline
+    internal var capacity: Int
+    
+    /// Refers to the amount of keys in the node.
+    @usableFromInline
+    internal var count: Int
+    
+    /// Pointer to the buffer containing the corresponding values.
+    @usableFromInline
+    internal var values: Buffer<Value>
+    
+    /// Pointer to the buffer containing the elements.
+    @usableFromInline
+    internal var children: Buffer<_Node<Key, Value>>?
   }
   
-  @inlinable
-  internal init(copyingFrom oldStorage: Self, capacity: Int) {
-    let elementCount = oldStorage.buffer.header.count
-    self.init(capacity: capacity, count: elementCount)
-    
-    oldStorage.buffer.withUnsafeMutablePointerToElements { elements in
-      self.buffer.withUnsafeMutablePointerToElements { newElements in
-        newElements.initialize(from: elements, count: elementCount)
-      }
-    }
-  }
-}
-
-// MARK: CoW
-extension _Node.Storage {
-  /// Ensure that this storage refers to a uniquely held buffer by copying
-  /// elements if necessary.
-  @inlinable
-  @inline(__always)
-  internal mutating func ensureUnique(capacity: Int) {
-    if !self.buffer.isUniqueReference() {
-      self = _Node.Storage(copyingFrom: self, capacity: capacity)
-    }
-  }
-}
-
-// MARK: Sequence
-extension _Node.Storage: Sequence {
+  /// Represents the underlying data for a node in the heap.
   @usableFromInline
-  internal struct Iterator: IteratorProtocol {
-    @usableFromInline
-    internal let storage: _Node.Storage<Element>
-    
-    @usableFromInline
-    internal var index: Int
-    
+  internal class Storage: ManagedBuffer<_Node.Header, Key> {
     @inlinable
-    @inline(__always)
-    internal init(storage: _Node.Storage<Element>) {
-      self.storage = storage
-      self.index = 0
-    }
-    
-    @inlinable
-    @inline(__always)
-    internal mutating func next() -> Element? {
-      if self.index >= storage.buffer.header.count {
-        return nil
-      } else {
-        defer { self.index += 1 }
-        return storage.buffer.withUnsafeMutablePointerToElements { $0[self.index] }
+    deinit {
+      self.withUnsafeMutablePointers { header, elements in
+        _ = header.pointee.values.withUnsafeMutablePointerToElements { values in
+          values.deinitialize(count: header.pointee.count)
+        }
+        
+        _ = header.pointee.children?.withUnsafeMutablePointerToElements { children in
+          children.deinitialize(count: header.pointee.count + 1)
+        }
+        
+        elements.deinitialize(count: header.pointee.count)
       }
     }
   }
-  
-  @inlinable
-  @inline(__always)
-  __consuming func makeIterator() -> Iterator {
-    return Iterator(storage: self)
-  }
 }
 
-// MARK: CustomDebugStringConvertible
-extension _Node.Storage: CustomDebugStringConvertible {
-  /// A textual representation of this instance, suitable for debugging.
-  public var debugDescription: String {
-    Array(self).debugDescription
-  }
+// MARK: Initializers
+extension _Node.Storage {
+  /// Creates an internal node with a given capacity
+  
 }

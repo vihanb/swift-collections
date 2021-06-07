@@ -61,31 +61,35 @@ extension _BTree {
   /// Updates a B-Tree at a specific path, running uniqueness checks as it
   /// traverses the tree.
   @inlinable
-  internal mutating func update(at path: Path, _ body: (Node.UnsafeHandle) -> Void) {
+  internal mutating func update<R>(at path: Path, _ body: (Node.UnsafeHandle) -> R) -> R {
     // TODO: get away from this recursion
-    func update(_ handle: Node.UnsafeHandle, depth: Int) {
+    func update(_ handle: Node.UnsafeHandle, depth: Int) -> R {
       if depth == path.offsets.count {
-        body(handle)
+        return body(handle)
       } else {
         let offset = path.offsets[depth]
-        handle[childAt: offset].update { update($0, depth: depth + 1) }
+        return handle[childAt: offset].update { update($0, depth: depth + 1) }
       }
     }
     
-    self.root.update { update($0, depth: 0) }
+    return self.root.update { update($0, depth: 0) }
   }
   
   /// Updates the corresponding value for a key in the tree.
   /// - Parameters:
   ///   - value: New value for the key.
   ///   - path: A valid path within the tree
+  /// - Returns: The old value, if replaced.
   /// - Complexity: O(1)
+  @discardableResult
   @inlinable
-  internal mutating func setValue(_ value: Value, at path: Path) {
+  internal mutating func setValue(_ value: Value, at path: Path) -> Value {
     // TODO: this involves two tree descents. One to find the key, another
     // to run the update
-    self.update(at: path) { handle in
+    return self.update(at: path) { handle in
+      let oldValue = handle[valueAt: path.slot]
       handle[valueAt: path.slot] = value
+      return oldValue
     }
   }
 }

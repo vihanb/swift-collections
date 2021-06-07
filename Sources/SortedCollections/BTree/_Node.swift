@@ -66,6 +66,7 @@ struct _Node<Key: Comparable, Value> {
       Header(
         capacity: capacity,
         count: 0,
+        totalElements: 0,
         values: Buffer<Value>.create(minimumCapacity: capacity) { _ in BufferHeader() },
         children: isLeaf ? nil
           : Buffer<_Node<Key, Value>>.create(minimumCapacity: capacity) { _ in BufferHeader() }

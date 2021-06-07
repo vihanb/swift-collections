@@ -10,6 +10,17 @@
 //===----------------------------------------------------------------------===//
 
 extension SortedDictionary: Collection {
+  /// The number of elements in the sorted dictionary.
+  /// - Complexity: O(1)
+  @inlinable
+  @inline(__always)
+  public var count: Int { self._root.count }
+  
+  /// A Boolean value that indicates whether the dictionary is empty.
+  @inlinable
+  @inline(__always)
+  public var isEmpty: Bool { self._root.isEmpty }
+  
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.

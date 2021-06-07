@@ -69,6 +69,8 @@ extension _Node {
     internal func checkInvariants() {
       assert(isLeaf || numChildren == numElements + 1, "Node must have either zero children or a child on the side of each key.")
       assert(numElements == numElements, "Node must have equal count of keys and values ")
+      assert(numElements >= 0, "Node cannot have negative number of elements")
+//      assert(numTotalElements >= numElements, "Total number of elements under node cannot be less than the number of immediate elements.")
       
       if numElements > 1 {
         for i in 0..<(numElements - 1) {
@@ -100,6 +102,7 @@ extension _Node {
     @inline(__always)
     internal var capacity: Int { header.pointee.capacity }
     
+    /// The number of elements immediately stored in the node
     @inlinable
     @inline(__always)
     internal var numElements: Int {
@@ -107,6 +110,15 @@ extension _Node {
       nonmutating set { assertMutable(); header.pointee.count = newValue }
     }
     
+    /// The total number of elements that this node directly or indirectly stores
+    @inlinable
+    @inline(__always)
+    internal var numTotalElements: Int {
+      get { header.pointee.totalElements }
+      nonmutating set { assertMutable(); header.pointee.totalElements = newValue }
+    }
+    
+    /// The number of children this node directly contains
     @inlinable
     @inline(__always)
     internal var numChildren: Int { self.isLeaf ? 0 : self.numElements + 1 }
@@ -356,6 +368,28 @@ extension _Node.UnsafeHandle {
       value: self.values.advanced(by: index).move()
     )
   }
+  
+  /// Recomputes the total amount of elements in two nodes.
+  @inlinable
+  @inline(__always)
+  internal func recomputeTotalElementCount(withRightSplit rightHandle: _Node.UnsafeHandle) {
+    let originalTotalElements = self.numTotalElements
+    var totalChildElements = 0
+    
+    if !self.isLeaf {
+      // Calculate total amount of child elements
+      // TODO: potentially evaluate min(left.children, right.children),
+      // but the cost of the branch will likely exceed the cost of 1 copmarison
+      for i in 0..<self.numChildren {
+        totalChildElements += self[childAt: i].storage.header.totalElements
+      }
+    }
+    
+    self.numTotalElements = self.numElements + totalChildElements
+    rightHandle.numTotalElements = originalTotalElements - self.numTotalElements
+    
+    checkInvariants()
+  }
 }
 
 // MARK: Node Mutations
@@ -398,6 +432,8 @@ extension _Node.UnsafeHandle {
           
           self.numElements = numLeftElements
           handle.numElements = numRightElements
+          
+          self.recomputeTotalElementCount(withRightSplit: handle)
         }
       } else if insertionIndex > rightMedian {
         splinterElement = self.moveElement(at: rightMedian)
@@ -439,6 +475,8 @@ extension _Node.UnsafeHandle {
           
           handle.numElements = self.numElements - rightMedian
           self.numElements = rightMedian
+          
+          self.recomputeTotalElementCount(withRightSplit: handle)
         }
       } else {
         // insertionIndex < rightMedian
@@ -479,6 +517,8 @@ extension _Node.UnsafeHandle {
           
           handle.numElements = self.numElements - (leftMedian + 1)
           self.numElements = leftMedian + 1
+          
+          self.recomputeTotalElementCount(withRightSplit: handle)
         }
       }
       
@@ -507,7 +547,8 @@ extension _Node.UnsafeHandle {
       }
       
       self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
-      self.numElements = numElements + 1
+      self.numElements += 1
+      self.numTotalElements += 1
       
       return nil
     }

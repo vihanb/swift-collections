@@ -10,6 +10,17 @@
 //===----------------------------------------------------------------------===//
 
 extension _BTree: Collection {
+  /// The total number of elements contained within the BTree
+  /// - Complexity: O(1)
+  @inlinable
+  @inline(__always)
+  internal var count: Int { self.root.storage.header.totalElements }
+  
+  /// A Boolean value that indicates whether the BTree is empty.
+  @inlinable
+  @inline(__always)
+  internal var isEmpty: Bool { self.count == 0 }
+  
   /// An index to an element of the BTree represented as a path.
   @usableFromInline
   internal struct Index: Comparable {

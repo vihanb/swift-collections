@@ -16,6 +16,7 @@ extension _Node {
     internal init(
       capacity: Int,
       count: Int,
+      totalElements: Int,
       values: _Node<Key, Value>.Buffer<Value>,
       children: _Node<Key, Value>.Buffer<_Node<Key, Value>>?
     ) {
@@ -23,6 +24,7 @@ extension _Node {
       self.count = count
       self.values = values
       self.children = children
+      self.totalElements = totalElements
     }
     
     @usableFromInline
@@ -31,6 +33,10 @@ extension _Node {
     /// Refers to the amount of keys in the node.
     @usableFromInline
     internal var count: Int
+    
+    /// The total amount of elements contained underneath this node
+    @usableFromInline
+    internal var totalElements: Int
     
     /// Pointer to the buffer containing the corresponding values.
     @usableFromInline

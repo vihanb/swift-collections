@@ -12,22 +12,26 @@
 extension _BTree: CustomDebugStringConvertible {
   #if DEBUG
   private enum PrintPosition { case start, end, middle }
-  private func indentDescription(_ description: String, position: PrintPosition) -> String {
-    let lines = description.split(separator: "\n")
+  private func indentDescription(_ node: _Node<Key, Value>, position: PrintPosition) -> String {
+    let label = "(\(node.read { $0.numTotalElements }))"
+    
+    let spaces = String(repeating: " ", count: label.count)
+    
+    let lines = describeNode(node).split(separator: "\n")
     return lines.enumerated().map({ index, line in
       var lineToInsert = line
       let middle = (lines.count - 1) / 2
       if index < middle {
         if position == .start {
-          return "    " + lineToInsert
+          return "   " + spaces + lineToInsert
         } else {
-          return "┃   " + lineToInsert
+          return "┃  " + spaces + lineToInsert
         }
       } else if index > middle {
         if position == .end {
-          return "    " + lineToInsert
+          return "   " + spaces + lineToInsert
         } else {
-          return "┃   " + lineToInsert
+          return "┃  " + spaces + lineToInsert
         }
       } else {
         switch line[line.startIndex] {
@@ -39,9 +43,9 @@ extension _BTree: CustomDebugStringConvertible {
         }
         
         switch position {
-        case .start: return "┏━━━" + lineToInsert
-        case .middle: return "┣━━━" + lineToInsert
-        case .end: return "┗━━━" + lineToInsert
+        case .start: return "┏━\(label)━" + lineToInsert
+        case .middle: return "┣━\(label)━" + lineToInsert
+        case .end: return "┗━\(label)━" + lineToInsert
         }
       }
     }).joined(separator: "\n")
@@ -53,7 +57,11 @@ extension _BTree: CustomDebugStringConvertible {
       var result = ""
       for index in 0..<handle.numElements {
         if !handle.isLeaf {
-          let childDescription = indentDescription(describeNode(handle[childAt: index]), position: index == 0 ? .start : .middle)
+          let child = handle[childAt: index]
+          let childDescription = indentDescription(
+            child,
+            position: index == 0 ? .start : .middle
+          )
           result += childDescription + "\n"
         }
         
@@ -75,7 +83,7 @@ extension _BTree: CustomDebugStringConvertible {
         debugPrint(handle[valueAt: index], terminator: "", to: &result)
         
         if !handle.isLeaf && index == handle.numElements - 1 {
-          let childDescription = indentDescription(describeNode(handle[childAt: index + 1]), position: .end)
+          let childDescription = indentDescription(handle[childAt: index + 1], position: .end)
           result += "\n" + childDescription
         }
         
@@ -87,7 +95,7 @@ extension _BTree: CustomDebugStringConvertible {
   
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
-    return "BTree<\(Key.self), \(Value.self)>\n" + indentDescription(describeNode(self.root), position: .end)
+    return "BTree<\(Key.self), \(Value.self)>\n" + indentDescription(self.root, position: .end)
   }
   #else
   /// A textual representation of this instance, suitable for debugging.

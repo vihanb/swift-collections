@@ -33,6 +33,7 @@ extension _Node {
         handle.children!.advanced(by: 1).initialize(to: self.rightChild)
         
         handle.numElements = 1
+        handle.numTotalElements = 1 + node.storage.header.totalElements + self.rightChild.storage.header.totalElements
       }
       return newNode
     }

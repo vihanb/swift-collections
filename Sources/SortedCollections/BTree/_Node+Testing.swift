@@ -27,7 +27,9 @@ extension _Node {
         handle.keys.advanced(by: index).initialize(to: key)
         handle.values.advanced(by: index).initialize(to: value)
       }
+      
       handle.numElements = keyValuePairs.count
+      handle.numTotalElements = keyValuePairs.count
     }
   }
   

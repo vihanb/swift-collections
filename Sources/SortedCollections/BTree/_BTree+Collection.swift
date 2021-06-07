@@ -80,6 +80,8 @@ extension _BTree: Collection {
   @inlinable
   internal var endIndex: Index { return Index(nil) }
   
+  /// Forms the index after
+  /// - Parameter index: <#index description#>
   @inlinable
   internal func formIndex(after index: inout Index) {
     guard var path = index.path else {
@@ -95,6 +97,10 @@ extension _BTree: Collection {
           // Re-traverse to find lowest where offset[parentDepth + 1] is a valid index
           var lastShiftableDepth = -1
           var lastShiftableSlot = -1
+          
+          // Making these unowned shouldn't be an issue, as it removes (?)
+          // some unneeded swift_retains. If some bug arises with this section
+          // of code, this may be a culprit though.
           unowned var lastShiftableNode: Node.Storage? = nil
           unowned var currentAncestor = self.root.storage
           
@@ -158,37 +164,5 @@ extension _BTree: Collection {
   @inlinable
   internal subscript(index: Index) -> Element {
     return index.path!.element
-  }
-  
-  /// Returns a path to the first key that is equal to given key.
-  /// - Returns: If found, returns a cursor to the element.
-  @inlinable
-  internal func findFirstKey(_ key: Key) -> Path? {
-    var offsets = [Int]()
-    var node: Node? = self.root
-    
-    while let currentNode = node {
-      let path: Path? = currentNode.read { handle in
-        let keyIndex = handle.firstIndex(of: key)
-        if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
-          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets)
-        } else {
-          if handle.isLeaf {
-            node = nil
-          } else {
-            offsets.append(keyIndex)
-            node = handle[childAt: keyIndex]
-          }
-          
-          return nil
-        }
-      }
-      
-      if let path = path {
-        return path
-      }
-    }
-    
-    return nil
   }
 }

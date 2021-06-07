@@ -385,6 +385,8 @@ extension _Node.UnsafeHandle {
       }
     }
     
+    assert(totalChildElements >= 0, "Cannot have negative number of child elements.")
+    
     self.numTotalElements = self.numElements + totalChildElements
     rightHandle.numTotalElements = originalTotalElements - self.numTotalElements
     
@@ -585,6 +587,9 @@ extension _Node.UnsafeHandle {
       
       if let splinter = splinter {
         return self.immediatelyInsert(splinter: splinter, at: insertionIndex)
+      } else {
+        // The node was added succesfully to a child
+        self.numTotalElements += 1
       }
       
       return nil

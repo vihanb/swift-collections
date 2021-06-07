@@ -31,27 +31,30 @@ struct _Node<Key: Comparable, Value> {
   @inline(__always)
   internal init(copyingFrom oldNode: _Node) {
     let capacity = oldNode.storage.header.capacity
-    let numElements = oldNode.storage.header.count
+    let count = oldNode.storage.header.count
+    let totalElements = oldNode.storage.header.totalElements
     let isLeaf = oldNode.storage.header.children == nil
+    
     self.init(withCapacity: capacity, isLeaf: isLeaf)
     
-    self.storage.header.count = numElements
+    self.storage.header.count = count
+    self.storage.header.totalElements = totalElements
     
     oldNode.storage.withUnsafeMutablePointerToElements { oldKeys in
       self.storage.withUnsafeMutablePointerToElements { newKeys in
-        newKeys.initialize(from: oldKeys, count: numElements)
+        newKeys.initialize(from: oldKeys, count: count)
       }
     }
     
     oldNode.storage.header.values.withUnsafeMutablePointerToElements { oldValues in
       self.storage.header.values.withUnsafeMutablePointerToElements { newValues in
-        newValues.initialize(from: oldValues, count: numElements)
+        newValues.initialize(from: oldValues, count: count)
       }
     }
     
     oldNode.storage.header.children?.withUnsafeMutablePointerToElements { oldChildren in
       self.storage.header.children!.withUnsafeMutablePointerToElements { newChildren in
-        newChildren.initialize(from: oldChildren, count: numElements + 1)
+        newChildren.initialize(from: oldChildren, count: count + 1)
       }
     }
   }
@@ -69,7 +72,7 @@ struct _Node<Key: Comparable, Value> {
         totalElements: 0,
         values: Buffer<Value>.create(minimumCapacity: capacity) { _ in BufferHeader() },
         children: isLeaf ? nil
-          : Buffer<_Node<Key, Value>>.create(minimumCapacity: capacity) { _ in BufferHeader() }
+          : Buffer<_Node<Key, Value>>.create(minimumCapacity: capacity + 1) { _ in BufferHeader() }
       )
     }
     

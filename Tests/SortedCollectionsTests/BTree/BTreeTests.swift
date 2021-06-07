@@ -14,6 +14,20 @@ import CollectionsTestSupport
 
 
 final class BTreeTests: CollectionTestCase {
+  func test_indexedAccess() {
+    var btree = _BTree<Int, Void>(capacity: 2)
+    let NUM_ELEMS = 10
+    for i in 0..<NUM_ELEMS {
+      print(btree)
+      btree.insertKey(i, withValue: ())
+    }
+    
+    for i in 0..<NUM_ELEMS {
+      let path = btree.pathToElement(at: i)
+      expectEqual(path.element.key, i)
+    }
+  }
+  
   func test_iterator() {
     let keyValuePairs = [
       (key: 1, value: "0"),

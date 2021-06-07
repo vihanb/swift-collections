@@ -93,3 +93,78 @@ extension _BTree {
     }
   }
 }
+
+// MARK: Read Operations
+extension _BTree {
+  /// Returns a path to the key at absolute offset `i`.
+  /// - Parameter offset: 0-indexed offset within BTree bounds, else may panic.
+  /// - Returns: the path to the appropriate element.
+  @inlinable
+  internal func pathToElement(at offset: Int) -> Path {
+    assert(offset < self.count, "Index out of bounds.")
+    
+    var offsets = [Int]()
+    
+    var node: _Node = self.root
+    var startIndex = 0
+    
+    while !node.read({ $0.isLeaf }) {
+      let internalPath: Path? = node.read { handle in
+        for childSlot in 0..<handle.numChildren {
+          let child = handle[childAt: childSlot]
+          let endIndex = startIndex + child.read({ $0.numTotalElements })
+          
+          if offset < endIndex {
+            offsets.append(childSlot)
+            node = child
+            return nil
+          } else if offset == endIndex {
+            // We've found the node we want
+            return Path(node: node, slot: childSlot, offsets: offsets)
+          } else {
+            startIndex = endIndex + 1
+          }
+        }
+        
+        preconditionFailure("In-bounds index not found within tree.")
+      }
+      
+      if let internalPath = internalPath { return internalPath }
+    }
+    
+    return Path(node: node, slot: offset - startIndex, offsets: offsets)
+  }
+  
+  /// Returns a path to the first key that is equal to given key.
+  /// - Returns: If found, returns a cursor to the element.
+  @inlinable
+  internal func findFirstKey(_ key: Key) -> Path? {
+    var offsets = [Int]()
+    var node: Node? = self.root
+    
+    while let currentNode = node {
+      let path: Path? = currentNode.read { handle in
+        let keyIndex = handle.firstIndex(of: key)
+        if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
+          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets)
+        } else {
+          if handle.isLeaf {
+            node = nil
+          } else {
+            offsets.append(keyIndex)
+            node = handle[childAt: keyIndex]
+          }
+          
+          return nil
+        }
+      }
+      
+      if let path = path {
+        return path
+      }
+    }
+    
+    return nil
+  }
+
+}

@@ -9,9 +9,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Totally arbitrary node capacity for BTree
+/// Totally arbitrary node capacity for BTree
 @usableFromInline
 internal let BTREE_NODE_CAPACITY = 3
+
+/// An expected rough upper bound for BTree depth
+@usableFromInline
+internal let BTREE_MAX_DEPTH = 10
 
 @usableFromInline
 internal struct _BTree<Key: Comparable, Value> {
@@ -25,6 +29,11 @@ internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
   internal var root: Node
   
+  /// Represents the path to the start index.
+  /// - Warning: This is not a valid path when the BTree is empty.
+  @usableFromInline
+  internal var startPath: Path
+  
   // TODO: remove
   @usableFromInline
   internal var capacity: Int
@@ -32,15 +41,18 @@ internal struct _BTree<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   internal init(capacity: Int = BTREE_NODE_CAPACITY) {
-    self.root = Node(withCapacity: capacity, isLeaf: true)
-    self.capacity = capacity
+    self.init(rootedAt: Node(withCapacity: capacity, isLeaf: true), capacity: capacity)
   }
   
   @inlinable
   @inline(__always)
   internal init(rootedAt root: Node, capacity: Int = BTREE_NODE_CAPACITY) {
+    assert(root.read({ $0.isLeaf }), "Constructing BTree rooted at non-leaf Node.")
     self.root = root
     self.capacity = capacity
+    
+    self.startPath = Path(node: self.root, slot: 0, offsets: [])
+    self.startPath.offsets.reserveCapacity(BTREE_MAX_DEPTH)
   }
 }
 
@@ -52,6 +64,7 @@ extension _BTree {
     let element = (key: key, value: value)
     if let splinter = self.root.update({ $0.insertElement(element) }) {
       self.root = splinter.toNode(from: root, withCapacity: self.capacity)
+      self.startPath.offsets.append(0)
     }
   }
 }

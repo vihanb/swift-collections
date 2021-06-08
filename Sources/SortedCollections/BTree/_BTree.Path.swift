@@ -13,6 +13,11 @@
 // TODO: potentially make operations mutating.
 
 extension _BTree {
+  // TODO: potentially rename to 'UnsafePath' to clearly identify
+  // the danger of not carefully handling paths.
+  // TODO: (Alternative) Have _BTree issues paths within closures
+  // which ensure that the _BTree lives as long as its paths.
+  
   /// Represents a specific element in a BTree. This holds strong references to the
   /// element it points to.
   /// - Warning: Operations on this path will trap if the underlying node is deallocated.
@@ -49,7 +54,7 @@ extension _BTree {
     
     /// Creates a path representing a sequence of nodes to an element.
     /// - Parameters:
-    ///   - node: The node to which this path points.
+    ///   - node: The node to which this path points. 
     ///   - slot: The specific slot within node where the path points
     ///   - parents: The parent nodes and their children's offsets for this path.
     @inlinable

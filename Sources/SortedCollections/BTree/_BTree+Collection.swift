@@ -56,29 +56,16 @@ extension _BTree: Collection {
   }
   
   /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
-  /// - Complexity: O(`log n`)
+  /// - Complexity: O(1)
   @inlinable
   internal var startIndex: Index {
-    if self.root.read({ $0.numElements }) == 0 {
-      return Index(nil)
-    }
-    
-    var depth = 0
-    var node: Node = self.root
-    
-    while node.read({ $0.numChildren }) > 0 {
-      node = node.read { $0[childAt: 0] }
-      depth += 1
-    }
-    
-    let offsets = [Int](repeating: 0, count: depth)
-    return Index(Path(node: node, slot: 0, offsets: offsets))
+    _slowPath(self.isEmpty) ? Index(nil) : Index(self.startPath)
   }
   
   /// Returns a sentinel value for the last element
   /// - Complexity: O(1)
   @inlinable
-  internal var endIndex: Index { return Index(nil) }
+  internal var endIndex: Index { Index(nil) }
   
   /// Forms the index after
   /// - Parameter index: <#index description#>

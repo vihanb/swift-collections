@@ -34,6 +34,9 @@ extension _BTree {
     @usableFromInline
     internal var slot: Int
     
+    @usableFromInline
+    internal var index: Int
+    
     // MARK: Validation
     #if COLLECTIONS_INTERNAL_CHECKS
     @inline(never)
@@ -57,9 +60,10 @@ extension _BTree {
     ///   - node: The node to which this path points. 
     ///   - slot: The specific slot within node where the path points
     ///   - parents: The parent nodes and their children's offsets for this path.
+    ///   - index: The absolute offset of this path's element in the tree.
     @inlinable
-    internal init(node: Node, slot: Int, offsets: [Int]) {
-      self.init(node: node.storage, slot: slot, offsets: offsets)
+    internal init(node: Node, slot: Int, offsets: [Int], index: Int) {
+      self.init(node: node.storage, slot: slot, offsets: offsets, index: index)
     }
     
     /// Creates a path representing a sequence of nodes to an element.
@@ -67,11 +71,13 @@ extension _BTree {
     ///   - node: The node to which this path points.
     ///   - slot: The specific slot within node where the path points
     ///   - parents: The parent nodes and their children's offsets for this path.
+    ///   - index: The absolute offset of this path's element in the tree.
     @inlinable
-    internal init(node: Node.Storage, slot: Int, offsets: [Int]) {
+    internal init(node: Node.Storage, slot: Int, offsets: [Int], index: Int) {
       self.node = node
       self.slot = slot
       self.offsets = offsets
+      self.index = index
       
       validatePath()
     }

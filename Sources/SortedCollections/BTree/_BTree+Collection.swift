@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension _BTree: Collection {
+extension _BTree: BidirectionalCollection {
   /// The total number of elements contained within the BTree
   /// - Complexity: O(1)
   @inlinable
@@ -67,8 +67,20 @@ extension _BTree: Collection {
   @inlinable
   internal var endIndex: Index { Index(nil) }
   
-  /// Forms the index after
-  /// - Parameter index: <#index description#>
+  /// Returns the distance between two indices.
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If end is equal to start, the result is zero.
+  /// - Returns: The distance between start and end. The result can be negative only if the collection conforms to the BidirectionalCollection protocol.
+  /// - Complexity: O(1)
+  @inlinable
+  internal func distance(from start: Index, to end: Index) -> Int {
+    return (end.path?.index ?? self.count) - (start.path?.index ?? self.count)
+  }
+  
+  /// Replaces the given index with its successor.
+  /// - Parameter index: A valid index of the collection. i must be less than endIndex.
+  /// - Complexity: O(`log n`) in the worst-case.
   @inlinable
   internal func formIndex(after index: inout Index) {
     guard var path = index.path else {
@@ -141,11 +153,130 @@ extension _BTree: Collection {
     }
   }
   
+  /// Returns the position immediately after the given index.
+  /// - Parameter i: A valid index of the collection. i must be less than endIndex.
+  /// - Returns: The index value immediately after i.
+  /// - Complexity: O(`log n`) in the worst-case.
   @inlinable
-  public func index(after i: Index) -> Index {
+  internal func index(after i: Index) -> Index {
     var newIndex = i
     self.formIndex(after: &newIndex)
     return newIndex
+  }
+  
+  /// Replaces the given index with its predecessor.
+  /// - Parameter index: A valid index of the collection. i must be greater than startIndex.
+  /// - Complexity: O(`log n`) in the worst-case.
+  @inlinable
+  internal func formIndex(before index: inout Index) {
+    assert(index.path != self.startPath, "Attempt to advance out of collection bounds.")
+    // TODO: implement more efficient logic to better move through the tree
+    self.formIndex(&index, offsetBy: -1)
+  }
+  
+  /// Returns the position immediately before the given index.
+  /// - Parameter i: A valid index of the collection. i must be greater than startIndex.
+  /// - Returns: The index value immediately before i.
+  /// - Complexity: O(`log n`) in the worst-case.
+  @inlinable
+  internal func index(before i: Index) -> Index {
+    var newIndex = i
+    self.formIndex(before: &newIndex)
+    return newIndex
+  }
+  
+  /// Offsets the given index by the specified distance.
+  ///
+  /// The value passed as distance must not offset i beyond the bounds of the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  /// - Complexity: O(`log n`) in the worst-case.
+  @inlinable
+  internal func formIndex(_ i: inout Index, offsetBy distance: Int) {
+    let newIndex = (i.path?.index ?? self.count) + distance
+    assert(0 <= newIndex && newIndex <= self.count, "Attempt to advance out of collection bounds.")
+    
+    if newIndex == self.count {
+      i.path = nil
+    }
+    
+    // TODO: optimization for searching within children
+    
+    if var path = i.path, path.node.header.children == nil {
+      // Check if the target element will be in the same node
+      let targetSlot = path.slot + distance
+      if 0 <= targetSlot && targetSlot < path.node.header.capacity {
+        path.slot = targetSlot
+        i.path = path
+      }
+    }
+    
+    // Otherwise, re-seek
+    i = Index(self.pathToElement(at: newIndex))
+  }
+  
+  /// Returns an index that is the specified distance from the given index.
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If `distance`
+  ///     is positive, this is the same value as the result of `distance` calls to
+  ///     `index(after:)`. If `distance` is negative, this is the same value as the
+  ///     result of `abs(distance)` calls to `index(before:)`.
+  @inlinable
+  internal func index(_ i: Index, offsetBy distance: Int) -> Index {
+    var newIndex = i
+    self.formIndex(&newIndex, offsetBy: distance)
+    return newIndex
+  }
+  
+  /// Offsets the given index by the specified distance, or so that it equals the given limiting index.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`, a limit that is
+  ///       less than `i` has no effect. Likewise, if `distance < 0`, a limit that is greater than `i`
+  ///       has no effect.
+  /// - Returns: `true` if `i` has been offset by exactly `distance` steps without going beyond
+  ///     `limit`; otherwise, `false`. When the return value is `false`, the value of `i` is equal
+  ///     to `limit`.
+  /// - Complexity: O(`log n`) in the worst-case.
+  @inlinable
+  internal func formIndex(_ i: inout Index, offsetBy distance: Int, limitedBy limit: Index) -> Bool {
+    let distanceToLimit = self.distance(from: i, to: limit)
+    if distance < 0 ? distanceToLimit > distance : distanceToLimit < distance {
+      self.formIndex(&i, offsetBy: distanceToLimit)
+      return false
+    } else {
+      self.formIndex(&i, offsetBy: distance)
+      return true
+    }
+  }
+  
+  /// Returns an index that is the specified distance from the given index, unless that distance
+  /// is beyond a given limiting index.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`, a `limit`
+  ///       that is less than `i` has no effect. Likewise, if `distance < 0`, a `limit` that is
+  ///       greater than `i` has no effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that index would
+  ///     be beyond `limit` in the direction of movement. In that case, the method returns `nil`.
+  @inlinable
+  internal func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
+    let distanceToLimit = self.distance(from: i, to: limit)
+    if distance < 0 ? distanceToLimit > distance : distanceToLimit < distance {
+      return nil
+    } else {
+      var newIndex = i
+      self.formIndex(&newIndex, offsetBy: distance)
+      return newIndex
+    }
   }
   
   @inlinable

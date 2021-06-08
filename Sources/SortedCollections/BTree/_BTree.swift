@@ -51,7 +51,7 @@ internal struct _BTree<Key: Comparable, Value> {
     self.root = root
     self.capacity = capacity
     
-    self.startPath = Path(node: self.root, slot: 0, offsets: [])
+    self.startPath = Path(node: self.root, slot: 0, offsets: [], index: 0)
     self.startPath.offsets.reserveCapacity(BTREE_MAX_DEPTH)
   }
 }
@@ -133,7 +133,7 @@ extension _BTree {
             return nil
           } else if offset == endIndex {
             // We've found the node we want
-            return Path(node: node, slot: childSlot, offsets: offsets)
+            return Path(node: node, slot: childSlot, offsets: offsets, index: offset)
           } else {
             startIndex = endIndex + 1
           }
@@ -145,7 +145,7 @@ extension _BTree {
       if let internalPath = internalPath { return internalPath }
     }
     
-    return Path(node: node, slot: offset - startIndex, offsets: offsets)
+    return Path(node: node, slot: offset - startIndex, offsets: offsets, index: offset)
   }
   
   /// Returns a path to the first key that is equal to given key.
@@ -159,7 +159,7 @@ extension _BTree {
       let path: Path? = currentNode.read { handle in
         let keyIndex = handle.firstIndex(of: key)
         if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
-          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets)
+          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets, index: 0)
         } else {
           if handle.isLeaf {
             node = nil

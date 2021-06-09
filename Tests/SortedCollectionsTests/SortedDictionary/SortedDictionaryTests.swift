@@ -13,24 +13,37 @@ import CollectionsTestSupport
 @_spi(Testing) @testable import SortedCollections
 
 final class SortedDictionaryTests: CollectionTestCase {
-  func test_simpleInsertion() {
-    var sortedDictionary: SortedDictionary<String, Int> = [:]
-    
-    sortedDictionary["B"] = 1
-    sortedDictionary["J"] = 1
-    sortedDictionary["A"] = 1
-    sortedDictionary["A"] = 2
-    sortedDictionary["Z"] = 1
-    sortedDictionary["E"] = 1
-    sortedDictionary["Q"] = 1
-    sortedDictionary["D"] = 1
-    
-    print(sortedDictionary.startIndex)
-    
-    for (key, value) in sortedDictionary {
-      print("\(key): \(value)")
+  func test_orderedInsertion() {
+    withEvery("count", in: 0..<10) { count in
+      var sortedDictionary: SortedDictionary<Int, Int> = [:]
+      
+      for i in 0..<count {
+        sortedDictionary[i] = i
+      }
+      
+      expectEqual(sortedDictionary.count, count)
+      expectEqual(sortedDictionary.underestimatedCount, count)
+      expectEqual(sortedDictionary.isEmpty, count == 0)
+      
+      for (i, (key, _)) in sortedDictionary.enumerated() {
+        expectEqual(key, i)
+      }
     }
-    
-    print(sortedDictionary._root)
+  }
+  
+  func test_updateValue() {
+    withEvery("count", in: 0..<10) { count in
+      var sortedDictionary: SortedDictionary<Int, Int> = [:]
+      
+      for i in 0..<count {
+        sortedDictionary[i] = i
+        sortedDictionary[i] = -sortedDictionary[i]!
+      }
+      
+      for (i, (key, value)) in sortedDictionary.enumerated() {
+        expectEqual(key, i)
+        expectEqual(value, -i)
+      }
+    }
   }
 }

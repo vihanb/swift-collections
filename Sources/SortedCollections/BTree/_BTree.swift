@@ -117,6 +117,7 @@ extension _BTree {
     assert(offset < self.count, "Index out of bounds.")
     
     var offsets = [Int]()
+    offsets.reserveCapacity(BTREE_MAX_DEPTH)
     
     var node: _Node = self.root
     var startIndex = 0

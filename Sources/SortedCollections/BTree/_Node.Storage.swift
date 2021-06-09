@@ -66,9 +66,3 @@ extension _Node {
     }
   }
 }
-
-// MARK: Initializers
-extension _Node.Storage {
-  /// Creates an internal node with a given capacity
-  
-}

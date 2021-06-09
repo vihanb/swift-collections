@@ -22,7 +22,54 @@ extension _BTree {
   /// element it points to.
   /// - Warning: Operations on this path will trap if the underlying node is deallocated.
   @usableFromInline
-  struct Path {
+  internal struct Path {
+    @usableFromInline
+    internal struct PackedOffsetList {
+      @usableFromInline
+      internal var depth: UInt8
+      
+      @usableFromInline
+      internal var offsets: UInt64
+      
+      @inlinable
+      @inline(__always)
+      internal init() {
+        self.depth = 0
+        self.offsets = 0
+      }
+      
+      @inlinable
+      @inline(__always)
+      internal mutating func pop() {
+        assert(depth != 0, "Attempted to ascend from root path.")
+        self.depth &-= 1
+      }
+      
+      @inlinable
+      @inline(__always)
+      internal mutating func move(by slots: UInt16) {
+        let level: UInt8 = depth << 4
+        let mask: UInt64 = UInt64(0xFFFF) << level
+        
+        var oldSlot = (offsets & mask) >> level
+        oldSlot &+= UInt64(slots)
+        
+        offsets = (offsets & ~mask) | (oldSlot << level)
+      }
+      
+      @inlinable
+      @inline(__always)
+      internal mutating func child(at slot: UInt16) {
+        assert(depth != 3, "Attempted to exceed maximum depth.")
+        depth &+= 1
+        
+        let level: UInt8 = depth << 4
+        let mask: UInt64 = UInt64(0xFFFF) << level
+        
+        offsets = (offsets & ~mask) | (UInt64(slot) << level)
+      }
+    }
+    
     /// The position of each of the parent nodes in their parents. The path's depth
     /// is offsets.count + 1
     @usableFromInline
@@ -43,7 +90,6 @@ extension _BTree {
     @usableFromInline
     internal func validatePath() {
       precondition(slot >= 0, "Slot must be non-negative integer")
-      precondition(Node(node).read { slot < $0.numElements }, "Slot must be within the node")
     }
     
     #else

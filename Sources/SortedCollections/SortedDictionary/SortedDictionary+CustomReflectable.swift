@@ -9,15 +9,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension OrderedDictionary {
-  #if COLLECTIONS_INTERNAL_CHECKS
-  @inline(never) @_effects(releasenone)
-  public func _checkInvariants() {
-    precondition(_keys.count == _values.count)
-//    _keys.__unstable._checkInvariants()
+extension SortedDictionary: CustomReflectable {
+  /// The custom mirror for this instance.
+  public var customMirror: Mirror {
+    // TODO: instead of Array(self), implement a Element view?
+    Mirror(self, unlabeledChildren: Array(self), displayStyle: .dictionary)
   }
-  #else
-  @inline(__always) @inlinable
-  public func _checkInvariants() {}
-  #endif // COLLECTIONS_INTERNAL_CHECKS
 }

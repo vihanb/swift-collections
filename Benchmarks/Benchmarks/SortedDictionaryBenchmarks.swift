@@ -9,15 +9,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension OrderedDictionary {
-  #if COLLECTIONS_INTERNAL_CHECKS
-  @inline(never) @_effects(releasenone)
-  public func _checkInvariants() {
-    precondition(_keys.count == _values.count)
-//    _keys.__unstable._checkInvariants()
-  }
-  #else
-  @inline(__always) @inlinable
-  public func _checkInvariants() {}
-  #endif // COLLECTIONS_INTERNAL_CHECKS
+import CollectionsBenchmark
+import SortedCollections
+
+extension Benchmark {
+  
 }

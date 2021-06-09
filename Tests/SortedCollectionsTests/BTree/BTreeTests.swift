@@ -12,6 +12,30 @@
 import CollectionsTestSupport
 @_spi(Testing) @testable import SortedCollections
 
+func btreeFromKeys<S: Sequence>(
+  _ keys: S
+) -> _BTree<Int, Int> where S.Element == Int {
+  var tree = _BTree<Int, Int>(capacity: 3)
+  for (i, key) in keys.enumerated() {
+    tree.insertKey(key, withValue: i)
+  }
+  return tree
+}
+
+
+func withEveryBTree(
+  upTo capacity: Int,
+  _ body: (_BTree<Int, Int>, [(key: Int, value: Int)]) throws -> Void
+) rethrows {
+  try withEvery("capacity", in: 0..<10) { capacity in
+    let elements = (0...capacity).map { (key: $0, value: $0) }
+    var tree = _BTree<Int, Int>(capacity: 3)
+    for (key, value) in elements {
+      tree.insertKey(key, withValue: value)
+    }
+    try body(tree, elements)
+  }
+}
 
 final class BTreeTests: CollectionTestCase {
   func test_indexedAccess() {
@@ -25,6 +49,13 @@ final class BTreeTests: CollectionTestCase {
     for i in 0..<NUM_ELEMS {
       let path = btree.pathToElement(at: i)
       expectEqual(path.element.key, i)
+    }
+  }
+  
+  func test_bidirectionalCollection() {
+    withEveryBTree(upTo: 10) { (tree, elements) in
+      checkBidirectionalCollection(
+        tree, expectedContents: elements, by: { $0.key == $1.key && $0.value == $1.value })
     }
   }
   

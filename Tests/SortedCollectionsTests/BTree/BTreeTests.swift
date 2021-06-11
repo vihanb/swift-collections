@@ -12,183 +12,157 @@
 import CollectionsTestSupport
 @_spi(Testing) @testable import SortedCollections
 
-func btreeFromKeys<S: Sequence>(
-  _ keys: S
-) -> _BTree<Int, Int> where S.Element == Int {
-  var tree = _BTree<Int, Int>(capacity: 3)
-  for (i, key) in keys.enumerated() {
-    tree.insertKey(key, withValue: i)
-  }
-  return tree
-}
-
-
-func withEveryBTree(
-  upTo capacity: Int,
-  _ body: (_BTree<Int, Int>, [(key: Int, value: Int)]) throws -> Void
+func btreeOfSize(
+  _ size: Int,
+  _ body: (inout _BTree<Int, Int>, [(key: Int, value: Int)]) throws -> Void
 ) rethrows {
-  try withEvery("capacity", in: 0..<10) { capacity in
-    let elements = (0...capacity).map { (key: $0, value: $0) }
-    var tree = _BTree<Int, Int>(capacity: 3)
-    for (key, value) in elements {
-      tree.insertKey(key, withValue: value)
-    }
-    try body(tree, elements)
+  var tree = _BTree<Int, Int>(capacity: 2)
+  var keyValues = [(key: Int, value: Int)]()
+  for i in 0..<size {
+    tree.insertKey(i, withValue: i * 2)
+    keyValues.append((key: i, value: i * 2))
+  }
+  try withExtendedLifetime(tree) {
+    try body(&tree, keyValues)
   }
 }
 
 final class BTreeTests: CollectionTestCase {
-  func test_indexedAccess() {
-    var btree = _BTree<Int, Void>(capacity: 2)
-    let NUM_ELEMS = 10
-    for i in 0..<NUM_ELEMS {
-      print(btree)
-      btree.insertKey(i, withValue: ())
+  func test_indexToElementAtOffset() {
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        for i in 0..<count {
+          let index = btree.indexToElement(at: i)
+          expectEqual(btree[index].key, i)
+        }
+      }
     }
-    
-    for i in 0..<NUM_ELEMS {
-      let path = btree.pathToElement(at: i)
-      expectEqual(path.element.key, i)
+  }
+  
+  func test_startIndex() {
+    withEvery("count", in: [0, 1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        if count == 0 {
+          expectEqual(btree.startIndex, btree.endIndex)
+        } else {
+          expectEqual(btree[btree.startIndex].key, 0)
+        }
+      }
+    }
+  }
+  
+  func test_indexAfter() {
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        var index = btree.startIndex
+        
+        for i in 0..<count {
+          expectEqual(btree[index].key, i)
+          btree.formIndex(after: &index)
+        }
+        
+        expectEqual(index, btree.endIndex)
+      }
+    }
+  }
+  
+  func test_indexBefore() {
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        var index = btree.endIndex
+        
+        for i in (0..<count).reversed() {
+          btree.formIndex(before: &index)
+          expectEqual(btree[index].key, i)
+        }
+      }
+    }
+  }
+  
+  func test_indexOffsetByForward() {
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        withEvery("baseIndex", in: 0...count) { baseIndex in
+          withEvery("distance", in: 0...(count - baseIndex)) { distance in
+            var index = btree.indexToElement(at: baseIndex)
+            btree.formIndex(&index, offsetBy: distance)
+            
+            let expectedIndex = btree.indexToElement(at: baseIndex + distance)
+            
+            expectEqual(index, expectedIndex)
+          }
+        }
+      }
+    }
+  }
+  
+  func test_indexOffsetByBackward() {
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+        withEvery("baseIndex", in: 0...count) { baseIndex in
+          withEvery("distance", in: 0...baseIndex) { distance in
+            var index = btree.indexToElement(at: baseIndex)
+            btree.formIndex(&index, offsetBy: -distance)
+            
+            let expectedIndex = btree.indexToElement(at: baseIndex - distance)
+            
+            expectEqual(index, expectedIndex)
+          }
+        }
+      }
     }
   }
   
   func test_bidirectionalCollection() {
-    withEveryBTree(upTo: 10) { (tree, elements) in
-      checkBidirectionalCollection(
-        tree, expectedContents: elements, by: { $0.key == $1.key && $0.value == $1.value })
+    withEvery("count", in: [1, 2, 4, 8, 16, 32, 64]) { count in
+      btreeOfSize(count) { btree, kvs in
+//        checkBidirectionalCollection(
+//          btree,
+//          expectedContents: kvs,
+//          by: { $0.key == $1.key && $0.value == $1.value }
+//        )
+      }
     }
   }
   
-  func test_iterator() {
-    let keyValuePairs = [
-      (key: 1, value: "0"),
-      (key: 2, value: "1"),
-      (key: 2, value: "2"),
-      (key: 2, value: "3"),
-      (key: 3, value: "4"),
+  func test_randomInsertionOrder() {
+    let kvs = [
+      (key: 71, value: 142),
+      (key: 0, value: 0),
+      (key: 53, value: 106),
+      (key: 72, value: 144),
+      (key: 74, value: 148),
+      (key: 29, value: 58),
+      (key: 24, value: 48),
+      (key: 58, value: 116),
+      (key: 17, value: 34),
+      (key: 46, value: 92),
+      (key: 62, value: 124),
+      (key: 51, value: 102),
+      (key: 70, value: 140),
+      (key: 9, value: 18),
+      (key: 75, value: 150),
+      (key: 26, value: 52),
+      (key: 69, value: 138),
+      (key: 8, value: 16),
+      (key: 30, value: 60),
+      (key: 1, value: 2),
+      (key: 12, value: 24),
+      (key: 63, value: 126),
+      (key: 49, value: 98),
+      (key: 14, value: 28),
+      (key: 43, value: 86),
+      (key: 78, value: 156)
     ]
-    
-    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: keyValuePairs.count)
-    let btree = _BTree(rootedAt: node)
-    
-    expectEqualElements(btree.root.toArray(), keyValuePairs)
-  }
-  
-  func test_simpleEvenSplinter() {
-    let keyValuePairs = [
-      (key: 1, value: "0"),
-      (key: 2, value: "1"),
-    ]
-    
-    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 2)
-    var btree = _BTree(rootedAt: node)
-    
-    btree.insertKey(1, withValue: "A")
-    
-    
-  }
-  
-  func test_23treeSplitting() {
-    let node = _Node<Int, String>(_keyValuePairs: [
-      (key: 2, value: "0"),
-      (key: 4, value: "1"),
-    ], capacity: 2)
-    
-    var btree = _BTree(rootedAt: node)
-    
-    btree.insertKey(3, withValue: "A")
-    btree.insertKey(4, withValue: "B")
-    
-    expectEqualElements(btree.root.toArray(), [
-      (key: 2, value: "0"),
-      (key: 3, value: "A"),
-      (key: 4, value: "1"),
-      (key: 4, value: "B"),
-    ])
-  }
-  
-  func test_splitMedianSplinterEven() {
-    let node = _Node<Int, Void>(_keyValuePairs: [
-      (key: 1, value: ()),
-      (key: 2, value: ()),
-      (key: 3, value: ()),
-      (key: 5, value: ()),
-      (key: 6, value: ()),
-      (key: 7, value: ()),
-    ], capacity: 6)
-    
-    var btree = _BTree(rootedAt: node)
-    print(btree)
-    btree.insertKey(4, withValue: ())
-    print(btree)
-  }
-  
-  func test_splitRightSplinterEven() {
-    let node = _Node<Int, Void>(_keyValuePairs: [
-      (key: 1, value: ()),
-      (key: 2, value: ()),
-      (key: 3, value: ()),
-      (key: 4, value: ()),
-      (key: 5, value: ()),
-      (key: 7, value: ()),
-    ], capacity: 6)
-    
-    var btree = _BTree(rootedAt: node)
-    print(btree)
-    btree.insertKey(6, withValue: ())
-    print(btree)
-  }
-  
-//  func test_interactiveTreeTest() {
-//    let node = _Node<Int, Void>(_keyValuePairs: [
-//      (key: 5, value: ()),
-//      (key: 10, value: ()),
-//    ], capacity: 2)
-//
-//    var btree = _BTree(rootedAt: node)
-//    print(btree)
-//
-//    while let line = readLine(strippingNewline: true) {
-//      if let newNum = Int(line) {
-//        btree.insertKey(newNum, withValue: ())
-//        print(btree)
-//      }
-//    }
-//  }
-  
-  func test_insertWithoutSplit() {
-    let keyValuePairs = [
-      (key: 1, value: "0"),
-      (key: 2, value: "1"),
-      (key: 2, value: "2"),
-      (key: 2, value: "3"),
-      (key: 3, value: "4"),
-    ]
-    
-    let node = _Node<Int, String>(_keyValuePairs: keyValuePairs, capacity: 100)
-    var btree = _BTree(rootedAt: node)
-    
-    btree.insertKey(2, withValue: "A")
-    btree.insertKey(4, withValue: "B")
-    
-    expectEqualElements(btree.root.toArray(), [
-      (key: 1, value: "0"),
-      (key: 2, value: "1"),
-      (key: 2, value: "2"),
-      (key: 2, value: "3"),
-      (key: 2, value: "A"),
-      (key: 3, value: "4"),
-      (key: 4, value: "B"),
-    ])
-  }
-  
-  func test_pathIterator() {
-    var btree = _BTree<Int, ()>(capacity: 4)
-    for i in 0..<100 {
-      btree.insertKey(i, withValue: ())
+
+    var tree = _BTree<Int, Int>()
+    withExtendedLifetime(tree) {
+      for (key, value) in kvs {
+        print(tree)
+        tree.insertKey(key, withValue: value)
+      }
+      
+      print(tree)
     }
-    
-    let btreeElems = Array(btree)
-//    expectEqualElements(btreeElems, btree.root.toArray())
   }
 }

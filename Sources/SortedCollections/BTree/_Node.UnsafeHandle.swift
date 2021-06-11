@@ -415,7 +415,7 @@ extension _Node.UnsafeHandle {
       
       var splinterElement: _Node.Element
       var rightNode = _Node(withCapacity: self.capacity, isLeaf: self.isLeaf)
-      
+      print(insertionIndex - rightMedian)
       if insertionIndex == rightMedian {
         splinterElement = element
         
@@ -438,6 +438,7 @@ extension _Node.UnsafeHandle {
           self.recomputeTotalElementCount(withRightSplit: handle)
         }
       } else if insertionIndex > rightMedian {
+        // This branch is almost certainly correct
         splinterElement = self.moveElement(at: rightMedian)
         
         rightNode.update { handle in
@@ -467,9 +468,9 @@ extension _Node.UnsafeHandle {
             
             self.moveChildren(
               toHandle: handle,
-              fromIndex: insertionIndex + 1,
-              toIndex: insertionIndexInRightNode + 1,
-              count: self.numChildren - (insertionIndex + 1)
+              fromIndex: insertionIndex,
+              toIndex: insertionIndexInRightNode + 2,
+              count: self.numChildren - insertionIndex
             )
           }
           
@@ -489,7 +490,7 @@ extension _Node.UnsafeHandle {
             toHandle: handle,
             fromIndex: leftMedian + 1,
             toIndex: 0,
-            count: self.numElements - (leftMedian + 1)
+            count: self.numElements - leftMedian - 1
           )
           
           self.moveElements(
@@ -504,7 +505,7 @@ extension _Node.UnsafeHandle {
               toHandle: handle,
               fromIndex: leftMedian + 1,
               toIndex: 0,
-              count: self.numChildren - (leftMedian + 1)
+              count: self.numChildren - leftMedian
             )
             
             self.moveChildren(
@@ -517,7 +518,7 @@ extension _Node.UnsafeHandle {
           
           self.insertElement(element, withRightChild: rightChild, at: insertionIndex)
           
-          handle.numElements = self.numElements - (leftMedian + 1)
+          handle.numElements = self.numElements - leftMedian - 1
           self.numElements = leftMedian + 1
           
           self.recomputeTotalElementCount(withRightSplit: handle)

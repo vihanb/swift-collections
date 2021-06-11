@@ -87,69 +87,17 @@ extension _BTree: BidirectionalCollection {
       preconditionFailure("Attempt to advance out of collection bounds.")
     }
     
-    Node(path.node).read { handle in
-      if handle.isLeaf {
-        if _fastPath(path.slot + 1 < handle.numElements) {
-          // Continue searching within the same leaf
-          path.slot += 1
-        } else {
-          // Re-traverse to find lowest where offset[parentDepth + 1] is a valid index
-          var lastShiftableDepth = -1
-          var lastShiftableSlot = -1
-          
-          // Making these unowned shouldn't be an issue, as it removes (?)
-          // some unneeded swift_retains. If some bug arises with this section
-          // of code, this may be a culprit though.
-          unowned var lastShiftableNode: Node.Storage? = nil
-          unowned var currentAncestor = self.root.storage
-          
-          for depth in 0..<path.offsets.count {
-            let numElems = Node(currentAncestor).read { $0.numElements }
-            let offset = path.offsets[depth]
-            if offset < numElems {
-              lastShiftableDepth = depth
-              lastShiftableNode = currentAncestor
-              lastShiftableSlot = offset
-            }
-            currentAncestor = Node(currentAncestor).read { $0[childAt: offset].storage }
-          }
-          
-          if let lastShiftableNode = lastShiftableNode {
-            path.offsets.removeLast(path.offsets.count - lastShiftableDepth)
-            
-            path.node = lastShiftableNode
-            path.slot = lastShiftableSlot
-            
-            path.validatePath()
-          } else {
-            index.path = nil
-            return
-          }
-        }
-      } else {
-        // Descend to leaf of child[slot + 1]
-        var child = handle[childAt: path.slot + 1]
-        path.offsets.append(path.slot + 1)
-        
-        if !child.read({ $0.isLeaf }) {
-          while true {
-            child.read { handle in
-              child = handle[childAt: 0]
-            }
-            
-            if child.read({ $0.isLeaf }) {
-              break
-            } else {
-              path.offsets.append(0)
-            }
-          }
-        }
-        
-        path.node = child.storage
-        path.slot = 0
-      }
-      
+    let shouldSeekWithinLeaf = Node(path.node).read({
+      $0.isLeaf && _fastPath(path.slot + 1 < $0.numElements)
+    })
+    
+    if shouldSeekWithinLeaf {
+      // Continue searching within the same leaf
+      path.slot += 1
+      path.index += 1
       index.path = path
+    } else {
+      self.formIndex(&index, offsetBy: 1)
     }
   }
   
@@ -200,6 +148,7 @@ extension _BTree: BidirectionalCollection {
     
     if newIndex == self.count {
       i.path = nil
+      return
     }
     
     // TODO: optimization for searching within children
@@ -214,7 +163,7 @@ extension _BTree: BidirectionalCollection {
     }
     
     // Otherwise, re-seek
-    i = Index(self.pathToElement(at: newIndex))
+    i = self.indexToElement(at: newIndex)
   }
   
   /// Returns an index that is the specified distance from the given index.
@@ -281,6 +230,7 @@ extension _BTree: BidirectionalCollection {
   
   @inlinable
   internal subscript(index: Index) -> Element {
+    assert(index.path != nil, "Attempt to subscript out of range index.")
     return index.path!.element
   }
 }

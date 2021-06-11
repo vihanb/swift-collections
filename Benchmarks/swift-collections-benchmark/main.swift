@@ -19,6 +19,7 @@ benchmark.addDictionaryBenchmarks()
 benchmark.addDequeBenchmarks()
 benchmark.addOrderedSetBenchmarks()
 benchmark.addOrderedDictionaryBenchmarks()
+benchmark.addSortedDictionaryBenchmarks()
 benchmark.addCppBenchmarks()
 
 benchmark.chartLibrary = try benchmark.loadReferenceLibrary()

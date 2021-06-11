@@ -111,10 +111,14 @@ extension _BTree {
 extension _BTree {
   /// Returns a path to the key at absolute offset `i`.
   /// - Parameter offset: 0-indexed offset within BTree bounds, else may panic.
-  /// - Returns: the path to the appropriate element.
+  /// - Returns: the index of the appropriate element.
   @inlinable
-  internal func pathToElement(at offset: Int) -> Path {
-    assert(offset < self.count, "Index out of bounds.")
+  internal func indexToElement(at offset: Int) -> Index {
+    assert(offset <= self.count, "Index out of bounds.")
+    
+    if offset == self.count {
+      return Index(nil)
+    }
     
     var offsets = [Int]()
     offsets.reserveCapacity(BTREE_MAX_DEPTH)
@@ -143,10 +147,10 @@ extension _BTree {
         preconditionFailure("In-bounds index not found within tree.")
       }
       
-      if let internalPath = internalPath { return internalPath }
+      if let internalPath = internalPath { return Index(internalPath) }
     }
     
-    return Path(node: node, slot: offset - startIndex, offsets: offsets, index: offset)
+    return Index(Path(node: node, slot: offset - startIndex, offsets: offsets, index: offset))
   }
   
   /// Returns a path to the first key that is equal to given key.

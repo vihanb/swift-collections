@@ -96,6 +96,26 @@ internal class CppUnorderedMap {
   }
 }
 
+internal class CppMap {
+  var ptr: UnsafeMutableRawPointer?
+  
+  init(_ input: [Int]) {
+    self.ptr = input.withUnsafeBufferPointer { buffer in
+      cpp_map_create(buffer.baseAddress, buffer.count)
+    }
+  }
+  
+  deinit {
+    destroy()
+  }
+  
+  func destroy() {
+    if let ptr = ptr {
+      cpp_map_destroy(ptr)
+    }
+    ptr = nil
+  }
+}
 
 extension Benchmark {
   public mutating func addCppBenchmarks() {
@@ -623,6 +643,15 @@ extension Benchmark {
           }
         }
         map.destroy()
+      }
+    }
+    
+    self.addSimple(
+      title: "std::map<intptr_t, intptr_t> insert",
+      input: [Int].self
+    ) { input in
+      input.withUnsafeBufferPointer { buffer in
+        cpp_map_insert_integers(buffer.baseAddress, buffer.count)
       }
     }
   }

@@ -70,12 +70,24 @@ extension _Node {
       assert(isLeaf || numChildren == numElements + 1, "Node must have either zero children or a child on the side of each key.")
       assert(numElements == numElements, "Node must have equal count of keys and values ")
       assert(numElements >= 0, "Node cannot have negative number of elements")
-//      assert(numTotalElements >= numElements, "Total number of elements under node cannot be less than the number of immediate elements.")
+      assert(numTotalElements >= numElements, "Total number of elements under node cannot be less than the number of immediate elements.")
       
       if numElements > 1 {
         for i in 0..<(numElements - 1) {
           precondition(self[keyAt: i] <= self[keyAt: i + 1], "Node is out-of-order.")
         }
+      }
+      
+      if !isLeaf && false {
+        for i in 0..<numElements {
+          let key = self[keyAt: i]
+          let child = self[childAt: i].read({ $0[keyAt: $0.numElements - 1] })
+          precondition(child <= key, "Left subtree must be less or equal to than its parent key.")
+        }
+        
+        let key = self[keyAt: numElements - 1]
+        let child = self[childAt: numElements].read({ $0[keyAt: $0.numElements - 1] })
+        precondition(child >= key, "Right subtree must be greater than or equal to than its parent key.")
       }
     }
     #else
@@ -129,33 +141,6 @@ extension _Node {
     internal var isLeaf: Bool { children == nil }
   }
 }
-
-// MARK: CustomDebugStringConvertible
-extension _Node.UnsafeHandle: CustomDebugStringConvertible {
-  /// A textual representation of this instance, suitable for debugging.
-  public var debugDescription: String {
-    var result = "Node<\(Key.self), \(Value.self)>(["
-    var first = true
-    for index in 0..<self.numElements {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      result += "("
-      debugPrint(self[keyAt: index], terminator: ", ", to: &result)
-      debugPrint(self[valueAt: index], terminator: ")", to: &result)
-    }
-    result += "], "
-    if let children = self.children {
-      debugPrint(Array(UnsafeBufferPointer(start: children, count: self.numChildren)), terminator: ")", to: &result)
-    } else {
-      result += "[])"
-    }
-    return result
-  }
-}
-
 
 // MARK: Subscript
 extension _Node.UnsafeHandle {
@@ -415,7 +400,7 @@ extension _Node.UnsafeHandle {
       
       var splinterElement: _Node.Element
       var rightNode = _Node(withCapacity: self.capacity, isLeaf: self.isLeaf)
-      print(insertionIndex - rightMedian)
+      
       if insertionIndex == rightMedian {
         splinterElement = element
         
@@ -468,9 +453,9 @@ extension _Node.UnsafeHandle {
             
             self.moveChildren(
               toHandle: handle,
-              fromIndex: insertionIndex,
+              fromIndex: insertionIndex + 1,
               toIndex: insertionIndexInRightNode + 2,
-              count: self.numChildren - insertionIndex
+              count: self.numElements - insertionIndex
             )
           }
           
@@ -505,7 +490,7 @@ extension _Node.UnsafeHandle {
               toHandle: handle,
               fromIndex: leftMedian + 1,
               toIndex: 0,
-              count: self.numChildren - leftMedian
+              count: self.numElements - leftMedian
             )
             
             self.moveChildren(
@@ -597,4 +582,126 @@ extension _Node.UnsafeHandle {
     }
   }
   
+}
+
+// MARK: CustomStringConvertible
+extension _Node.UnsafeHandle: CustomStringConvertible {
+  /// A textual representation of this instance, suitable for debugging.
+  public var description: String {
+    var result = "Node<\(Key.self), \(Value.self)>(["
+    var first = true
+    for index in 0..<self.numElements {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      result += "("
+      debugPrint(self[keyAt: index], terminator: ", ", to: &result)
+      debugPrint(self[valueAt: index], terminator: ")", to: &result)
+    }
+    result += "], "
+    if let children = self.children {
+      debugPrint(Array(UnsafeBufferPointer(start: children, count: self.numChildren)), terminator: ")", to: &result)
+    } else {
+      result += "[])"
+    }
+    return result
+  }
+}
+
+// MARK: CustomDebugStringConvertible
+extension _Node.UnsafeHandle: CustomDebugStringConvertible {
+  #if DEBUG
+  private enum PrintPosition { case start, end, middle }
+  private func indentDescription(_ node: _Node<Key, Value>.UnsafeHandle, position: PrintPosition) -> String {
+    let label = "(\(node.numTotalElements))"
+    
+    let spaces = String(repeating: " ", count: label.count)
+    
+    let lines = describeNode(node).split(separator: "\n")
+    return lines.enumerated().map({ index, line in
+      var lineToInsert = line
+      let middle = (lines.count - 1) / 2
+      if index < middle {
+        if position == .start {
+          return "   " + spaces + lineToInsert
+        } else {
+          return "┃  " + spaces + lineToInsert
+        }
+      } else if index > middle {
+        if position == .end {
+          return "   " + spaces + lineToInsert
+        } else {
+          return "┃  " + spaces + lineToInsert
+        }
+      } else {
+        switch line[line.startIndex] {
+        case "╺": lineToInsert.replaceSubrange(...line.startIndex, with: "━")
+        case "┗": lineToInsert.replaceSubrange(...line.startIndex, with: "┻")
+        case "┏": lineToInsert.replaceSubrange(...line.startIndex, with: "┳")
+        case "┣": lineToInsert.replaceSubrange(...line.startIndex, with: "╋")
+        default: break
+        }
+        
+        switch position {
+        case .start: return "┏━\(label)━" + lineToInsert
+        case .middle: return "┣━\(label)━" + lineToInsert
+        case .end: return "┗━\(label)━" + lineToInsert
+        }
+      }
+    }).joined(separator: "\n")
+  }
+  
+  /// A textual representation of this instance, suitable for debugging.
+  private func describeNode(_ node: _Node<Key, Value>.UnsafeHandle) -> String {
+    var result = ""
+    for index in 0..<node.numElements {
+      if !node.isLeaf {
+        let child = node[childAt: index]
+        let childDescription = child.read {
+          indentDescription($0, position: index == 0 ? .start : .middle)
+        }
+        result += childDescription + "\n"
+      }
+      
+      if node.isLeaf {
+        if node.numElements == 1 {
+          result += "╺━ "
+        } else if index == node.numElements - 1 {
+          result += "┗━ "
+        } else if index == 0 {
+          result += "┏━ "
+        } else {
+          result += "┣━ "
+        }
+      } else {
+        result += "┣━ "
+      }
+      
+      debugPrint(node[keyAt: index], terminator: ": ", to: &result)
+      debugPrint(node[valueAt: index], terminator: "", to: &result)
+      
+      if !node.isLeaf && index == node.numElements - 1 {
+        let childDescription = node[childAt: index + 1].read {
+          indentDescription($0, position: .end)
+        }
+        result += "\n" + childDescription
+      }
+      
+      result += "\n"
+    }
+    return result
+  }
+  
+  /// A textual representation of this instance, suitable for debugging.
+  public var debugDescription: String {
+    return indentDescription(self, position: .end)
+  }
+  #else
+  /// A textual representation of this instance, suitable for debugging.
+  public var debugDescription: String {
+    return self.description
+  }
+  #endif // DEBUG
 }

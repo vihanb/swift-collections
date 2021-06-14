@@ -59,7 +59,7 @@ extension _BTree: BidirectionalCollection {
   /// - Complexity: O(1)
   @inlinable
   internal var startIndex: Index {
-    _slowPath(self.isEmpty) ? Index(nil) : Index(self.startPath)
+    self.indexToElement(at: 0)
   }
   
   /// Returns a sentinel value for the last element
@@ -117,7 +117,7 @@ extension _BTree: BidirectionalCollection {
   /// - Complexity: O(`log n`) in the worst-case.
   @inlinable
   internal func formIndex(before index: inout Index) {
-    assert(index.path != self.startPath, "Attempt to advance out of collection bounds.")
+    assert(!self.isEmpty && index.path?.index != 0, "Attempt to advance out of collection bounds.")
     // TODO: implement more efficient logic to better move through the tree
     self.formIndex(&index, offsetBy: -1)
   }

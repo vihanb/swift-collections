@@ -152,17 +152,13 @@ final class BTreeTests: CollectionTestCase {
       (key: 49, value: 98),
       (key: 14, value: 28),
       (key: 43, value: 86),
-      (key: 78, value: 156)
+      (key: 78, value: 156),
+      (key: 100, value: 152),
     ]
 
     var tree = _BTree<Int, Int>()
-    withExtendedLifetime(tree) {
-      for (key, value) in kvs {
-        print(tree)
-        tree.insertKey(key, withValue: value)
-      }
-      
-      print(tree)
+    for (key, value) in kvs {
+      tree.insertKey(key, withValue: value)
     }
   }
 }

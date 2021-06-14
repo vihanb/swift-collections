@@ -14,10 +14,11 @@ extension _Node {
   @_spi(Testing)
   public init<C: Collection>(
     _keyValuePairs keyValuePairs: C,
+    children: [_Node<Key, Value>]? = nil,
     capacity: Int
   ) where C.Element == Element {
     precondition(keyValuePairs.count <= capacity, "Too many key-value pairs.")
-    self.init(withCapacity: capacity, isLeaf: true)
+    self.init(withCapacity: capacity, isLeaf: children == nil)
     
     self.update { handle in
       let sortedKeyValuePairs = keyValuePairs.sorted(by: { $0.key < $1.key })
@@ -28,8 +29,16 @@ extension _Node {
         handle.values.advanced(by: index).initialize(to: value)
       }
       
+      if let children = children {
+        for (index, child) in children.enumerated() {
+          handle.children!.advanced(by: index).initialize(to: child)
+        }
+      }
+      
+      let totalChildElements = children?.reduce(0, { $0 + $1.read({ $0.numTotalElements }) })
+      
       handle.numElements = keyValuePairs.count
-      handle.numTotalElements = keyValuePairs.count
+      handle.numTotalElements = keyValuePairs.count + (totalChildElements ?? 0)
     }
   }
   

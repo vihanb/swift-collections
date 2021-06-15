@@ -170,11 +170,6 @@ extension _Node.UnsafeHandle {
       assert(index < self.numElements, "Node key subscript out of bounds.")
       return self.keys[index]
     }
-    
-    nonmutating set(newValue) {
-      assert(index < self.numElements, "Node key subscript out of bounds.")
-      self.keys[index] = newValue
-    }
   }
   
   @inlinable
@@ -183,11 +178,6 @@ extension _Node.UnsafeHandle {
     get {
       assert(index < self.numElements, "Node values subscript out of bounds.")
       return self.values[index]
-    }
-    
-    nonmutating set(newValue) {
-      assert(index < self.numElements, "Node values subscript out of bounds.")
-      self.values[index] = newValue
     }
   }
   
@@ -201,11 +191,10 @@ extension _Node.UnsafeHandle {
       return self.children![index]
     }
     
-    nonmutating set(newChild) {
-      assertMutable()
-      assert(index < self.numChildren, "Node element subscript out of bounds.")
-      assert(!isLeaf, "Cannot access children of leaf node.")
-      self.children![index] = newChild
+    nonmutating _modify {
+      var child = self.children!.advanced(by: index).move()
+      defer { self.children!.advanced(by: index).initialize(to: child) }
+      yield &child
     }
   }
 }

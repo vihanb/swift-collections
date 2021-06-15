@@ -25,3 +25,4 @@ benchmark.addCppBenchmarks()
 benchmark.chartLibrary = try benchmark.loadReferenceLibrary()
 
 benchmark.main()
+

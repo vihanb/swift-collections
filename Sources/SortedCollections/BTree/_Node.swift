@@ -10,7 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 @usableFromInline
-struct _Node<Key: Comparable, Value> {
+internal struct _Node<Key: Comparable, Value> {
   @usableFromInline
   typealias Element = (key: Key, value: Value)
   

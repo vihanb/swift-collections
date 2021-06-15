@@ -71,6 +71,7 @@ extension _BTree {
   /// Updates a B-Tree at a specific path, running uniqueness checks as it
   /// traverses the tree.
   @inlinable
+  @inline(__always) 
   internal mutating func update<R>(at path: Path, _ body: (Node.UnsafeHandle) -> R) -> R {
     // TODO: get away from this recursion
     func update(_ handle: Node.UnsafeHandle, depth: Int) -> R {
@@ -97,8 +98,8 @@ extension _BTree {
     // TODO: this involves two tree descents. One to find the key, another
     // to run the update
     return self.update(at: path) { handle in
-      let oldValue = handle[valueAt: path.slot]
-      handle[valueAt: path.slot] = value
+      let oldValue = handle.values.advanced(by: path.slot).move()
+      handle.values.advanced(by: path.slot).initialize(to: value)
       return oldValue
     }
   }

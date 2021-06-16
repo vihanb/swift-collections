@@ -29,14 +29,14 @@ extension Benchmark {
       input: [Int].self
     ) { input in
       return { timer in
-        var node = _Node<Int, Int>(withCapacity: 470, isLeaf: true)
+        var node = _Node<Int, Int>(withCapacity: 1050, isLeaf: true)
         for key in input {
           let splinter = node.update { handle in
             handle.insertElement((key: key, value: key * 2))
           }
           
           if let splinter = splinter {
-            node = splinter.toNode(from: node, withCapacity: 470)
+            node = splinter.toNode(from: node, withCapacity: 1050)
           }
         }
         blackHole(node)

@@ -13,16 +13,11 @@
 // TODO: potentially make operations mutating.
 
 extension _BTree {
-  // TODO: potentially rename to 'UnsafePath' to clearly identify
-  // the danger of not carefully handling paths.
-  // TODO: (Alternative) Have _BTree issues paths within closures
-  // which ensure that the _BTree lives as long as its paths.
-  
   /// Represents a specific element in a BTree. This holds strong references to the
   /// element it points to.
   /// - Warning: Operations on this path will trap if the underlying node is deallocated.
   @usableFromInline
-  internal struct Path {
+  internal struct UnsafePath {
     @usableFromInline
     internal struct PackedOffsetList {
       @usableFromInline
@@ -138,23 +133,23 @@ extension _BTree {
 }
 
 // MARK: Equatable
-extension _BTree.Path: Equatable {
+extension _BTree.UnsafePath: Equatable {
   /// Returns true if two paths are identical (point to the same node).
   /// - Precondition: expects both paths are from the same BTree.
   /// - Complexity: O(1)
   @inlinable
-  public static func ==(lhs: _BTree.Path, rhs: _BTree.Path) -> Bool {
+  public static func ==(lhs: _BTree.UnsafePath, rhs: _BTree.UnsafePath) -> Bool {
     // We assume the parents are the same
     return lhs.node === rhs.node && lhs.slot == rhs.slot
   }
 }
 
 // MARK: Comparable
-extension _BTree.Path: Comparable {
+extension _BTree.UnsafePath: Comparable {
   /// Returns true if the first path points to an element before the second path
   /// - Complexity: O(`log n`)
   @inlinable
-  public static func <(lhs: _BTree.Path, rhs: _BTree.Path) -> Bool {
+  public static func <(lhs: _BTree.UnsafePath, rhs: _BTree.UnsafePath) -> Bool {
     for i in 0..<min(lhs.offsets.count, rhs.offsets.count) {
       if lhs.offsets[i] < rhs.offsets[i] {
         return true

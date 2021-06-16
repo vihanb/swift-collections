@@ -54,7 +54,7 @@ let package = Package(
     .library(name: "Collections", targets: ["Collections"]),
     .library(name: "DequeModule", targets: ["DequeModule"]),
     .library(name: "OrderedCollections", targets: ["OrderedCollections"]),
-    .library(name: "SortedCollections", targets: ["SortedCollections"])
+    .library(name: "SortedCollections", type: .dynamic, targets: ["SortedCollections"])
   ],
   dependencies: [
     // This is only used in the benchmark executable target.

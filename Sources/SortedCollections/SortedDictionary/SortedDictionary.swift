@@ -56,7 +56,6 @@ public struct SortedDictionary<Key: Comparable, Value> {
   public init<S>(
     uniqueKeysWithValues keysAndValues: S
   ) where S: Sequence, S.Element == Element {
-    // TODO: optimize to O(N)
     self.init()
     
     for (key, value) in keysAndValues {

@@ -9,9 +9,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+// TODO: decide node capacity. Currently exploring 470 v 1050
+// TODO: better benchmarking here
 /// Totally arbitrary node capacity for BTree
 @usableFromInline
-internal let BTREE_NODE_CAPACITY = 470
+internal let BTREE_NODE_CAPACITY = 1050
 
 /// An expected rough upper bound for BTree depth
 @usableFromInline
@@ -72,7 +74,7 @@ extension _BTree {
   /// traverses the tree.
   @inlinable
   @inline(__always) 
-  internal mutating func update<R>(at path: Path, _ body: (Node.UnsafeHandle) -> R) -> R {
+  internal mutating func update<R>(at path: UnsafePath, _ body: (Node.UnsafeHandle) -> R) -> R {
     // TODO: get away from this recursion
     func update(_ handle: Node.UnsafeHandle, depth: Int) -> R {
       if depth == path.offsets.count {
@@ -94,7 +96,7 @@ extension _BTree {
   /// - Complexity: O(1)
   @discardableResult
   @inlinable
-  internal mutating func setValue(_ value: Value, at path: Path) -> Value {
+  internal mutating func setValue(_ value: Value, at path: UnsafePath) -> Value {
     // TODO: this involves two tree descents. One to find the key, another
     // to run the update
     return self.update(at: path) { handle in
@@ -125,7 +127,7 @@ extension _BTree {
     var startIndex = 0
     
     while !node.read({ $0.isLeaf }) {
-      let internalPath: Path? = node.read { handle in
+      let internalPath: UnsafePath? = node.read { handle in
         for childSlot in 0..<handle.numChildren {
           let child = handle[childAt: childSlot]
           let endIndex = startIndex + child.read({ $0.numTotalElements })
@@ -136,7 +138,7 @@ extension _BTree {
             return nil
           } else if offset == endIndex {
             // We've found the node we want
-            return Path(node: node, slot: childSlot, offsets: offsets, index: offset)
+            return UnsafePath(node: node, slot: childSlot, offsets: offsets, index: offset)
           } else {
             startIndex = endIndex + 1
           }
@@ -148,21 +150,21 @@ extension _BTree {
       if let internalPath = internalPath { return Index(internalPath) }
     }
     
-    return Index(Path(node: node, slot: offset - startIndex, offsets: offsets, index: offset))
+    return Index(UnsafePath(node: node, slot: offset - startIndex, offsets: offsets, index: offset))
   }
   
   /// Returns a path to the first key that is equal to given key.
   /// - Returns: If found, returns a cursor to the element.
   @inlinable
-  internal func findFirstKey(_ key: Key) -> Path? {
+  internal func findFirstKey(_ key: Key) -> UnsafePath? {
     var offsets = [Int]()
     var node: Node? = self.root
     
     while let currentNode = node {
-      let path: Path? = currentNode.read { handle in
+      let path: UnsafePath? = currentNode.read { handle in
         let keyIndex = handle.firstIndex(of: key)
         if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
-          return Path(node: currentNode.storage, slot: keyIndex, offsets: offsets, index: 0)
+          return UnsafePath(node: currentNode.storage, slot: keyIndex, offsets: offsets, index: 0)
         } else {
           if handle.isLeaf {
             node = nil

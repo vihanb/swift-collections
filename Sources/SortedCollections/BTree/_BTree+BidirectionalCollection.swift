@@ -25,11 +25,11 @@ extension _BTree: BidirectionalCollection {
   @usableFromInline
   internal struct Index: Comparable {
     @usableFromInline
-    internal var path: Path?
+    internal var path: UnsafePath?
     
     @inlinable
     @inline(__always)
-    internal init(_ path: Path?) {
+    internal init(_ path: UnsafePath?) {
       self.path = path
     }
     

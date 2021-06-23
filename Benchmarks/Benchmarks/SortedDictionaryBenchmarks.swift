@@ -10,7 +10,6 @@
 //===----------------------------------------------------------------------===//
 
 import CollectionsBenchmark
-import SortedCollections
 
 extension Benchmark {
   public mutating func addSortedDictionaryBenchmarks() {
@@ -18,28 +17,72 @@ extension Benchmark {
       title: "SortedDictionary<Int, Int> init(uniqueKeysWithValues:)",
       input: [Int].self
     ) { input in
-      let keysAndValues = input.map { ($0, 2 * $0) }
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      
       return { timer in
         blackHole(SortedDictionary(uniqueKeysWithValues: keysAndValues))
       }
     }
     
     self.add(
-      title: "SortedDictionary<Int, Int>._Node",
+      title: "SortedDictionary<Int, Int> subscript, append",
       input: [Int].self
     ) { input in
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      var sortedDictionary = SortedDictionary<Int, Int>()
+      
       return { timer in
-        var node = _Node<Int, Int>(withCapacity: 1050, isLeaf: true)
-        for key in input {
-          let splinter = node.update { handle in
-            handle.insertElement((key: key, value: key * 2))
-          }
-          
-          if let splinter = splinter {
-            node = splinter.toNode(from: node, withCapacity: 1050)
-          }
+        for (key, value) in keysAndValues {
+          sortedDictionary[key] = value
         }
-        blackHole(node)
+        blackHole(sortedDictionary)
+      }
+    }
+    
+    self.add(
+      title: "SortedDictionary<Int, Int> subscript, successful lookups",
+      input: [Int].self
+    ) { input in
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      var sortedDictionary = SortedDictionary<Int, Int>(uniqueKeysWithValues: keysAndValues)
+      
+      return { timer in
+        for (key, value) in keysAndValues {
+          precondition(sortedDictionary[key] == value)
+        }
+      }
+    }
+    
+    self.add(
+      title: "SortedDictionary<Int, Int>._BTree firstValue recursive",
+      input: [Int].self
+    ) { input in
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      var tree = _BTree<Int, Int>()
+      
+      for (key, value) in keysAndValues {
+        tree.insertOrUpdate((key, value))
+      }
+      
+      return { timer in
+        for (key, value) in keysAndValues {
+          precondition(tree.firstValue(for: key) == value)
+        }
+      }
+    }
+    
+    self.add(
+      title: "SortedDictionary<Int, Int>._BTree insertOrUpdate(element:)",
+      input: [Int].self
+    ) { input in
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      
+      return { timer in
+        var tree = _BTree<Int, Int>()
+        for (key, value) in keysAndValues {
+          tree.insertOrUpdate((key, value))
+        }
+        blackHole(tree)
       }
     }
   }

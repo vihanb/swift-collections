@@ -103,7 +103,7 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "output"
+            argument = "/Users/vihan/Documents/swift-collections/output"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

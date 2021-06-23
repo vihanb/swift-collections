@@ -19,7 +19,7 @@ func btreeOfSize(
   var tree = _BTree<Int, Int>(capacity: 2)
   var keyValues = [(key: Int, value: Int)]()
   for i in 0..<size {
-    tree.insertKey(i, withValue: i * 2)
+    tree.insertOrUpdate((i, i * 2))
     keyValues.append((key: i, value: i * 2))
   }
   try withExtendedLifetime(tree) {
@@ -158,7 +158,7 @@ final class BTreeTests: CollectionTestCase {
 
     var tree = _BTree<Int, Int>()
     for (key, value) in kvs {
-      tree.insertKey(key, withValue: value)
+      tree.insertOrUpdate((key, value))
     }
   }
 }

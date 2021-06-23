@@ -24,6 +24,14 @@ struct NodeTemplate {
     )
   }
   
+  func toBTree(ofCapacity capacity: Int) -> _BTree<Int, Int> {
+    return _BTree(rootedAt: self.toNode(ofCapacity: capacity), capacity: capacity)
+  }
+  
+  func matches(_ btree: _BTree<Int, Int>) -> Bool {
+    return self.matches(btree.root)
+  }
+  
   func matches(_ node: _Node<Int, Int>) -> Bool {
     return node.read { handle in
       if self.keys.count != handle.numElements { return false }

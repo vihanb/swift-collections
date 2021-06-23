@@ -654,5 +654,17 @@ extension Benchmark {
         cpp_map_insert_integers(buffer.baseAddress, buffer.count)
       }
     }
+    
+    self.add(
+      title: "std::map<intptr_t, intptr_t> successful find",
+      input: ([Int], [Int]).self
+    ) { input, lookups in
+      let map = CppMap(input)
+      return { timer in
+        lookups.withUnsafeBufferPointer { buffer in
+          cpp_map_lookups(map.ptr, buffer.baseAddress, buffer.count, true)
+        }
+      }
+    }
   }
 }

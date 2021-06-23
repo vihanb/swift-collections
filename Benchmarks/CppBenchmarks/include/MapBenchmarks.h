@@ -29,6 +29,8 @@ extern void cpp_map_destroy(void *ptr);
 
 extern void cpp_map_insert_integers(const intptr_t *start, size_t count);
 
+extern void cpp_map_lookups(void *ptr, const intptr_t *start, size_t count, bool expectMatch);
+
 #ifdef __cplusplus
 }
 #endif

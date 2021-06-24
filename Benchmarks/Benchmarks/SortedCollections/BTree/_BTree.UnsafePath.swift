@@ -16,6 +16,8 @@ extension _BTree {
   /// Represents a specific element in a BTree. This holds strong references to the
   /// element it points to.
   /// - Warning: Operations on this path will trap if the underlying node is deallocated.
+  ///   and they become invalid if the tree is mutated, however this is not checked. For
+  ///   safety, use ``_BTree.Index`` instead
   @usableFromInline
   internal struct UnsafePath {
     @usableFromInline

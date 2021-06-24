@@ -11,9 +11,14 @@
 
 // TODO: decide node capacity. Currently exploring 470 v 1050
 // TODO: better benchmarking here
-/// Totally arbitrary node capacity for BTree
+
+/// Internal node capacity for BTree
 @usableFromInline
-internal let BTREE_NODE_CAPACITY = 470
+internal let BTREE_INTERNAL_CAPACITY = 16
+
+/// Leaf node capacity for BTree
+@usableFromInline
+internal let BTREE_LEAF_CAPACITY = 470
 
 /// An expected rough upper bound for BTree depth
 @usableFromInline
@@ -32,26 +37,48 @@ internal struct _BTree<Key: Comparable, Value> {
   internal var root: Node
   
   // TODO: remove
+  /// The capacity of each of the internal nodes
   @usableFromInline
-  internal var capacity: Int
+  internal var internalCapacity: Int
   
-  /// Creates an empty BTree which creates node with a provided `capacity`.
-  /// - Parameter capacity: A capacity of minimum 2 to create nodes with.
+  /// Creates an empty BTree rooted at a specific node with a specified uniform capacity
+  /// - Parameter capacity: The key capacity of all nodes.
   @inlinable
   @inline(__always)
-  internal init(capacity: Int = BTREE_NODE_CAPACITY) {
-    self.init(rootedAt: Node(withCapacity: capacity, isLeaf: true), capacity: capacity)
+  internal init(capacity: Int) {
+    self.init(leafCapacity: capacity, internalCapacity: capacity)
+  }
+  
+  /// Creates an empty BTree which creates node with specified capacities
+  /// - Parameters:
+  ///   - leafCapacity: The capacity of the leaf nodes. This is the initial buffer used to allocate.
+  ///   - internalCapacity: The capacity of the internal nodes. Generally prefered to be less than `leafCapacity`.
+  @inlinable
+  @inline(__always)
+  internal init(leafCapacity: Int = BTREE_LEAF_CAPACITY, internalCapacity: Int = BTREE_INTERNAL_CAPACITY) {
+    self.init(rootedAt: Node(withCapacity: leafCapacity, isLeaf: true), leafCapacity: leafCapacity, internalCapacity: internalCapacity)
+  }
+  
+  /// Creates a BTree rooted at a specific node with a specified uniform capacity
+  /// - Parameters:
+  ///   - root: The root node.
+  ///   - capacity: The key capacity of all nodes.
+  @inlinable
+  @inline(__always)
+  internal init(rootedAt root: Node, capacity: Int) {
+    self.init(rootedAt: root, leafCapacity: capacity, internalCapacity: capacity)
   }
   
   /// Creates a BTree rooted at a specific node.
   /// - Parameters:
   ///   - root: The root node.
-  ///   - capacity: The capacity with which to allocate new root nodes.
+  ///   - leafCapacity: The capacity of the leaf nodes. This is the initial buffer used to allocate.
+  ///   - internalCapacity: The capacity of the internal nodes. Generally prefered to be less than `leafCapacity`.
   @inlinable
   @inline(__always)
-  internal init(rootedAt root: Node, capacity: Int = BTREE_NODE_CAPACITY) {
+  internal init(rootedAt root: Node, leafCapacity: Int = BTREE_LEAF_CAPACITY, internalCapacity: Int = BTREE_INTERNAL_CAPACITY) {
     self.root = root
-    self.capacity = capacity
+    self.internalCapacity = internalCapacity
   }
 }
 
@@ -191,7 +218,7 @@ extension _BTree {
     case let .updated(previousValue):
       return previousValue
     case let .splintered(splinter):
-      self.root = splinter.toNode(from: self.root, withCapacity: self.capacity)
+      self.root = splinter.toNode(from: self.root, withCapacity: self.internalCapacity)
     default: break
     }
     
@@ -249,6 +276,39 @@ extension _BTree {
   
   /// Returns the value corresponding to the first instance of the key
   @inlinable
+  internal func firstValueIterative(for key: Key) -> Value? {
+    // TODO: check if switching to unowned storage removes
+    // the retain/release calls
+    // Retain
+    var node: Node? = self.root
+    
+    while let currentNode = node {
+      let value: Value? = currentNode.read { handle in
+        let index = handle.firstIndex(of: key)
+        
+        if index < handle.numElements && handle[keyAt: index] == key {
+          return handle[valueAt: index]
+        } else {
+          if handle.isLeaf {
+            node = nil
+          } else {
+            // Release
+            // Retain
+            node = handle[childAt: index]
+          }
+        }
+        
+        return nil
+      }
+      
+      if let value = value { return value }
+    }
+    
+    return nil
+  }
+  
+  /// Returns the value corresponding to the first instance of the key
+  @inlinable
   internal func firstValue(for key: Key) -> Value? {
     func findValue(in handle: Node.UnsafeHandle) -> Value? {
       let index = handle.firstIndex(of: key)
@@ -259,11 +319,7 @@ extension _BTree {
           return previousMatch
         }
         
-        if handle[keyAt: index] == key {
-          return handle[valueAt: index]
-        } else {
-          return nil
-        }
+        return handle[valueAt: index]
       } else {
         if handle.isLeaf {
           return nil

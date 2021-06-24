@@ -66,7 +66,25 @@ extension Benchmark {
       
       return { timer in
         for (key, value) in keysAndValues {
-          precondition(tree.firstValue(for: key) == value)
+          blackHole(tree.firstValue(for: key))
+        }
+      }
+    }
+    
+    self.add(
+      title: "SortedDictionary<Int, Int>._BTree firstValue iterative",
+      input: [Int].self
+    ) { input in
+      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
+      var tree = _BTree<Int, Int>()
+      
+      for (key, value) in keysAndValues {
+        tree.insertOrUpdate((key, value))
+      }
+      
+      return { timer in
+        for (key, value) in keysAndValues {
+          blackHole(tree.firstValueIterative(for: key))
         }
       }
     }

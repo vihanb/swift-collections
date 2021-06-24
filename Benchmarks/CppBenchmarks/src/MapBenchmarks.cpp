@@ -44,12 +44,18 @@ cpp_map_insert_integers(const intptr_t *start, size_t count)
   black_hole(&map);
 }
 
+__attribute__((noinline))
+auto find(custom_map* map, intptr_t value)
+{
+  return map->find(value);
+}
+
 void
 cpp_map_lookups(void *ptr, const intptr_t *start, size_t count, bool expectMatch)
 {
   auto map = static_cast<custom_map *>(ptr);
   for (auto it = start; it < start + count; ++it) {
-    auto found = map->find(*it) != map->end();
+    auto found = find(map, *it) != map->end();
     if (found != expectMatch) { abort(); }
   }
 }

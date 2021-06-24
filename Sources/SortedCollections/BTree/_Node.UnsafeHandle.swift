@@ -210,12 +210,13 @@ extension _Node.UnsafeHandle {
     var end: Int = self.numElements
     
     while end > start {
-      let mid = (end - start) / 2 + start
+      let mid = (end &- start) / 2 &+ start
       
+      // TODO: make this info a conditional_mov
       if key <= self.keys[mid] {
         end = mid
       } else {
-        start = mid + 1
+        start = mid &+ 1
       }
     }
     

@@ -275,8 +275,9 @@ extension _BTree {
   }
   
   /// Returns the value corresponding to the first instance of the key
+  /// - Complexity: O(`log n`)
   @inlinable
-  internal func firstValueIterative(for key: Key) -> Value? {
+  internal func firstValue(for key: Key) -> Value? {
     // TODO: check if switching to unowned storage removes
     // the retain/release calls
     // Retain
@@ -305,31 +306,6 @@ extension _BTree {
     }
     
     return nil
-  }
-  
-  /// Returns the value corresponding to the first instance of the key
-  @inlinable
-  internal func firstValue(for key: Key) -> Value? {
-    func findValue(in handle: Node.UnsafeHandle) -> Value? {
-      let index = handle.firstIndex(of: key)
-      
-      if index < handle.numElements && handle[keyAt: index] == key {
-        if !handle.isLeaf,
-           let previousMatch = handle[childAt: index].read({ findValue(in: $0) }) {
-          return previousMatch
-        }
-        
-        return handle[valueAt: index]
-      } else {
-        if handle.isLeaf {
-          return nil
-        } else {
-          return handle[childAt: index].read { findValue(in: $0) }
-        }
-      }
-    }
-    
-    return self.root.read { findValue(in: $0) }
   }
   
   /// Returns a path to the first key that is equal to given key.

@@ -44,7 +44,7 @@ extension Benchmark {
       input: [Int].self
     ) { input in
       let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
-      var sortedDictionary = SortedDictionary<Int, Int>(uniqueKeysWithValues: keysAndValues)
+      let sortedDictionary = SortedDictionary<Int, Int>(uniqueKeysWithValues: keysAndValues)
       
       return { timer in
         for (key, value) in keysAndValues {
@@ -54,7 +54,7 @@ extension Benchmark {
     }
     
     self.add(
-      title: "SortedDictionary<Int, Int>._BTree firstValue recursive",
+      title: "SortedDictionary<Int, Int>._BTree firstValue",
       input: [Int].self
     ) { input in
       let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
@@ -66,25 +66,7 @@ extension Benchmark {
       
       return { timer in
         for (key, value) in keysAndValues {
-          blackHole(tree.firstValue(for: key))
-        }
-      }
-    }
-    
-    self.add(
-      title: "SortedDictionary<Int, Int>._BTree firstValue iterative",
-      input: [Int].self
-    ) { input in
-      let keysAndValues = input.lazy.map { (key: $0, value: 2 * $0) }
-      var tree = _BTree<Int, Int>()
-      
-      for (key, value) in keysAndValues {
-        tree.insertOrUpdate((key, value))
-      }
-      
-      return { timer in
-        for (key, value) in keysAndValues {
-          blackHole(tree.firstValueIterative(for: key))
+          precondition(tree.firstValue(for: key) == value)
         }
       }
     }

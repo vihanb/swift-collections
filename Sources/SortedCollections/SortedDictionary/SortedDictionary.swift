@@ -112,10 +112,10 @@ extension SortedDictionary {
   /// - Returns: The value associated with key if key is in the dictionary; otherwise, nil.
   /// - Complexity: O(`log n`)
   @inlinable
+  @inline(__always)
   public subscript(key: Key) -> Value? {
     get {
-      let path = self._root.findFirstKey(key)
-      return path?.element.value
+      return self._root.firstValue(for: key)
     }
     
     mutating set {
@@ -142,6 +142,7 @@ extension SortedDictionary {
   /// - Returns: The value associated with key in the dictionary; otherwise, defaultValue.
   /// - Complexity: O(`log n`)
   @inlinable
+  @inline(__always)
   public subscript(
     key: Key, default defaultValue: @autoclosure () -> Value
   ) -> Value {

@@ -12,6 +12,7 @@
 extension SortedDictionary {
   /// Returns the index for a given key, if it exists
   /// - Complexity: O(`log n`)
+  @inlinable
   public func index(forKey key: Key) -> Index? {
     if let path = self._root.findFirstKey(key) {
       return Index(_index: _Tree.Index(path), forDictionary: self)
@@ -41,6 +42,7 @@ extension SortedDictionary {
     
    /// Asserts the index is valid for a given dictionary
     @inlinable
+    @inline(__always)
     internal func _assertValid(for dictionary: SortedDictionary) {
       precondition(
         self._root === dictionary._root.root.storage && self._age == dictionary._age,
@@ -49,6 +51,7 @@ extension SortedDictionary {
     
     /// Asserts that the index is valid for use with another index
     @inlinable
+    @inline(__always)
     internal func _assertValid(with index: Index) {
       precondition(
         self._root != nil && self._root === index._root,
@@ -60,6 +63,7 @@ extension SortedDictionary {
 // MARK: Equatable
 extension SortedDictionary.Index: Equatable {
   // TODO: Potentially validate if lhs & rhs aren't pointing to deallocated dictionaries.
+  @inlinable
   public static func ==(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
     lhs._assertValid(with: rhs)
     return lhs._index == rhs._index
@@ -68,6 +72,7 @@ extension SortedDictionary.Index: Equatable {
 
 // MARK: Comparable
 extension SortedDictionary.Index: Comparable {
+  @inlinable
   public static func <(lhs: SortedDictionary.Index, rhs: SortedDictionary.Index) -> Bool {
     lhs._assertValid(with: rhs)
     return lhs._index < rhs._index

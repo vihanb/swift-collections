@@ -646,14 +646,14 @@ extension Benchmark {
       }
     }
     
-    self.addSimple(
-      title: "std::map<intptr_t, intptr_t> insert",
-      input: [Int].self
-    ) { input in
-      input.withUnsafeBufferPointer { buffer in
-        cpp_map_insert_integers(buffer.baseAddress, buffer.count)
-      }
-    }
+//    self.addSimple(
+//      title: "std::map<intptr_t, intptr_t> insert",
+//      input: [Int].self
+//    ) { input in
+//      input.withUnsafeBufferPointer { buffer in
+//        cpp_map_insert_integers(buffer.baseAddress, buffer.count)
+//      }
+//    }
     
     self.add(
       title: "std::map<intptr_t, intptr_t> successful find",

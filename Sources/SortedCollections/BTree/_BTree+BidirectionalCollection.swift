@@ -21,62 +21,40 @@ extension _BTree: BidirectionalCollection {
   @inline(__always)
   internal var isEmpty: Bool { self.count == 0 }
   
-  /// An index to an element of the BTree represented as a path.
-  /// - Warning: operations using this type do not perform checks if the
-  ///     tree is still valid. Therefore, operations using this may result in
-  ///     undefined behavior if the tree is muated or deallocated.
-  @usableFromInline
-  internal struct Index: Comparable {
-    /// The path to the element in the BTree. A `nil` value indicates
-    /// the endIndex
-    @usableFromInline
-    internal var path: UnsafePath?
-    
-    @inlinable
-    @inline(__always)
-    internal init(_ path: UnsafePath?) {
-      self.path = path
-    }
-    
-    @inlinable
-    @inline(__always)
-    internal static func ==(lhs: Index, rhs: Index) -> Bool {
-      return lhs.path?.node === rhs.path?.node
-    }
-    
-    @inlinable
-    @inline(__always)
-    internal static func <(lhs: Index, rhs: Index) -> Bool {
-      switch (lhs.path, rhs.path) {
-      case let (lhsPath?, rhsPath?):
-        return lhsPath < rhsPath
-      case (_?, nil):
-        return true
-      case (nil, _?):
-        return false
-      case (nil, nil):
-        return false
-      }
-    }
-  }
-  
   /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
   /// - Complexity: O(1)
   @inlinable
   internal var startIndex: Index {
-    self.indexToElement(at: 0)
+    if count == 0 { return Index(nil, forTree: self) }
+    var depth = 0
+    var currentNode = self.root
+    while !currentNode.read({ $0.isLeaf }) {
+      // TODO: figure out how to avoid the swift retain here
+      currentNode = currentNode.read({ $0[childAt: 0] })
+      depth += 1
+    }
+    
+    let path = UnsafePath(
+      node: currentNode,
+      slot: 0,
+      childSlots: Array<Int>(repeating: 0, count: depth),
+      offset: 0
+    )
+    
+    return Index(path, forTree: self)
   }
   
   /// Returns a sentinel value for the last element
   /// - Complexity: O(1)
   @inlinable
-  internal var endIndex: Index { Index(nil) }
+  internal var endIndex: Index { Index(nil, forTree: self) }
   
   /// Gets the effective offset of an index
+  /// - Warning: this does not
   @inlinable
   @inline(__always)
   internal func offset(of index: Index) -> Int {
-    return index.path?.index ?? self.count
+    return index.path?.offset ?? self.count
   }
   
   /// Returns the distance between two indices.
@@ -106,7 +84,7 @@ extension _BTree: BidirectionalCollection {
     if shouldSeekWithinLeaf {
       // Continue searching within the same leaf
       path.slot += 1
-      path.index += 1
+      path.offset += 1
       index.path = path
     } else {
       self.formIndex(&index, offsetBy: 1)
@@ -170,7 +148,7 @@ extension _BTree: BidirectionalCollection {
       let targetSlot = path.slot + distance
       if 0 <= targetSlot && targetSlot < path.node.header.count {
         path.slot = targetSlot
-        path.index = newIndex
+        path.offset = newIndex
         i.path = path
         return
       }
@@ -248,4 +226,98 @@ extension _BTree: BidirectionalCollection {
     assert(index.path != nil, "Attempt to subscript out of range index.")
     return index.path!.element
   }
+}
+
+// MARK: Custom Indexing Operations
+extension _BTree {
+  /// Returns the path corresponding to the first found instance of the key. This may
+  /// not be the first instance of the key. This is marginally more efficient for trees
+  /// that do not have duplicates.
+  ///
+  /// - Parameter key: The key to search for within the tree.
+  /// - Returns: If found, returns a path to the element. Otherwise, `nil`.
+  @inlinable
+  internal func anyIndex(forKey key: Key) -> Index? {
+    var childSlots = [Int]()
+    childSlots.reserveCapacity(BTREE_MAX_DEPTH)
+    var node: Node? = self.root
+    
+    while let currentNode = node {
+      let path: UnsafePath? = currentNode.read { handle in
+        let keySlot = handle.firstSlot(for: key)
+        if keySlot < handle.numElements && handle[keyAt: keySlot] == key {
+          return UnsafePath(node: currentNode.storage, slot: keySlot, childSlots: childSlots, offset: 0)
+        } else {
+          if handle.isLeaf {
+            node = nil
+          } else {
+            childSlots.append(keySlot)
+            node = handle[childAt: keySlot]
+          }
+          
+          return nil
+        }
+      }
+      
+      if let path = path {
+        return Index(path, forTree: self)
+      }
+    }
+    
+    return nil
+  }
+  
+  /// Returns a path to the key at absolute offset `i`.
+  /// - Parameter offset: 0-indexed offset within BTree bounds, else may panic.
+  /// - Returns: the index of the appropriate element.
+  /// - Complexity: O(`log n`)
+  @inlinable
+  internal func indexToElement(at offset: Int) -> Index {
+    assert(offset <= self.count, "Index out of bounds.")
+    
+    if offset == self.count {
+      return Index(nil, forTree: self)
+    }
+    
+    var childSlots = [Int]()
+    childSlots.reserveCapacity(BTREE_MAX_DEPTH)
+    
+    var node: _Node = self.root
+    var startIndex = 0
+    
+    while !node.read({ $0.isLeaf }) {
+      let internalPath: UnsafePath? = node.read { handle in
+        for childSlot in 0..<handle.numChildren {
+          let child = handle[childAt: childSlot]
+          let endIndex = startIndex + child.read({ $0.numTotalElements })
+          
+          if offset < endIndex {
+            childSlots.append(childSlot)
+            node = child
+            return nil
+          } else if offset == endIndex {
+            // We've found the node we want
+            return UnsafePath(node: node, slot: childSlot, childSlots: childSlots, offset: offset)
+          } else {
+            startIndex = endIndex + 1
+          }
+        }
+        
+        // TODO: convert into debug-only preconditionFaliure
+        preconditionFailure("In-bounds index not found within tree.")
+      }
+      
+      if let internalPath = internalPath { return Index(internalPath, forTree: self) }
+    }
+    
+    let path: UnsafePath = UnsafePath(
+      node: node,
+      slot: offset - startIndex,
+      childSlots: childSlots,
+      offset: offset
+    )
+    
+    return Index(path, forTree: self)
+  }
+
 }

@@ -67,19 +67,21 @@ extension _BTree {
       }
     }
     
+    // TODO: potentially make compact (U)Int8/16 type to be more compact
     /// The position of each of the parent nodes in their parents. The path's depth
     /// is offsets.count + 1
     @usableFromInline
-    internal var offsets: [Int] // TODO: potentially make compact (U)Int8/16 type to be more compact
+    internal var childSlots: Array<Int>
     
     @usableFromInline
-    internal unowned var node: Node.Storage
+    internal unowned(unsafe) var node: Node.Storage
     
     @usableFromInline
     internal var slot: Int
     
+    /// The absolute offset of the path's element in the entire tree
     @usableFromInline
-    internal var index: Int
+    internal var offset: Int
     
     // MARK: Validation
     #if COLLECTIONS_INTERNAL_CHECKS
@@ -105,8 +107,12 @@ extension _BTree {
     ///   - parents: The parent nodes and their children's offsets for this path.
     ///   - index: The absolute offset of this path's element in the tree.
     @inlinable
-    internal init(node: Node, slot: Int, offsets: [Int], index: Int) {
-      self.init(node: node.storage, slot: slot, offsets: offsets, index: index)
+    internal init(
+      node: Node,
+      slot: Int,
+      childSlots: Array<Int>,
+      offset: Int) {
+      self.init(node: node.storage, slot: slot, childSlots: childSlots, offset: offset)
     }
     
     /// Creates a path representing a sequence of nodes to an element.
@@ -116,11 +122,16 @@ extension _BTree {
     ///   - parents: The parent nodes and their children's offsets for this path.
     ///   - index: The absolute offset of this path's element in the tree.
     @inlinable
-    internal init(node: Node.Storage, slot: Int, offsets: [Int], index: Int) {
+    internal init(
+      node: Node.Storage,
+      slot: Int,
+      childSlots: Array<Int>,
+      offset: Int
+    ) {
       self.node = node
       self.slot = slot
-      self.offsets = offsets
-      self.index = index
+      self.childSlots = childSlots
+      self.offset = offset
       
       validatePath()
     }
@@ -152,17 +163,17 @@ extension _BTree.UnsafePath: Comparable {
   /// - Complexity: O(`log n`)
   @inlinable
   public static func <(lhs: _BTree.UnsafePath, rhs: _BTree.UnsafePath) -> Bool {
-    for i in 0..<min(lhs.offsets.count, rhs.offsets.count) {
-      if lhs.offsets[i] < rhs.offsets[i] {
+    for i in 0..<min(lhs.childSlots.count, rhs.childSlots.count) {
+      if lhs.childSlots[i] < rhs.childSlots[i] {
         return true
       }
     }
     
-    if lhs.offsets.count < rhs.offsets.count {
-      let rhsOffset = rhs.offsets[lhs.offsets.count - 1]
+    if lhs.childSlots.count < rhs.childSlots.count {
+      let rhsOffset = rhs.childSlots[lhs.childSlots.count - 1]
       return lhs.slot < rhsOffset
-    } else if rhs.offsets.count < lhs.offsets.count {
-      let lhsOffset = lhs.offsets[rhs.offsets.count - 1]
+    } else if rhs.childSlots.count < lhs.childSlots.count {
+      let lhsOffset = lhs.childSlots[rhs.childSlots.count - 1]
       return lhsOffset <= rhs.slot
     } else {
       return lhs.slot < rhs.slot

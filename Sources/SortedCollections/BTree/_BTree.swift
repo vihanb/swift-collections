@@ -24,6 +24,13 @@ internal let BTREE_LEAF_CAPACITY = 470
 @usableFromInline
 internal let BTREE_MAX_DEPTH = 10
 
+/// A bidirectional collection representing a BTree which efficiently stores its
+/// elements in sorted order and maintains roughly `O(log count)`
+/// performance for most operations.
+///
+/// - Warning: Indexing operations on a BTree are unchecked. ``_BTree.Index``
+///   offers `ensureValid(for:)` methods to validate indices for use in higher-level
+///   collections.
 @usableFromInline
 internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
@@ -41,12 +48,21 @@ internal struct _BTree<Key: Comparable, Value> {
   @usableFromInline
   internal var internalCapacity: Int
   
+  /// A metric to uniquely identify a given BTree's state. It is not
+  /// impossible for two BTrees to have the same age by pure
+  /// coincidence.
+  @usableFromInline
+  internal var age: Int32
+  
   /// Creates an empty BTree rooted at a specific node with a specified uniform capacity
   /// - Parameter capacity: The key capacity of all nodes.
   @inlinable
   @inline(__always)
   internal init(capacity: Int) {
-    self.init(leafCapacity: capacity, internalCapacity: capacity)
+    self.init(
+      leafCapacity: capacity,
+      internalCapacity: capacity
+    )
   }
   
   /// Creates an empty BTree which creates node with specified capacities
@@ -56,7 +72,11 @@ internal struct _BTree<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   internal init(leafCapacity: Int = BTREE_LEAF_CAPACITY, internalCapacity: Int = BTREE_INTERNAL_CAPACITY) {
-    self.init(rootedAt: Node(withCapacity: leafCapacity, isLeaf: true), leafCapacity: leafCapacity, internalCapacity: internalCapacity)
+    self.init(
+      rootedAt: Node(withCapacity: leafCapacity, isLeaf: true),
+      leafCapacity: leafCapacity,
+      internalCapacity: internalCapacity
+    )
   }
   
   /// Creates a BTree rooted at a specific node with a specified uniform capacity
@@ -66,7 +86,11 @@ internal struct _BTree<Key: Comparable, Value> {
   @inlinable
   @inline(__always)
   internal init(rootedAt root: Node, capacity: Int) {
-    self.init(rootedAt: root, leafCapacity: capacity, internalCapacity: capacity)
+    self.init(
+      rootedAt: root,
+      leafCapacity: capacity,
+      internalCapacity: capacity
+    )
   }
   
   /// Creates a BTree rooted at a specific node.
@@ -79,11 +103,20 @@ internal struct _BTree<Key: Comparable, Value> {
   internal init(rootedAt root: Node, leafCapacity: Int = BTREE_LEAF_CAPACITY, internalCapacity: Int = BTREE_INTERNAL_CAPACITY) {
     self.root = root
     self.internalCapacity = internalCapacity
+    self.age = Int32(truncatingIfNeeded: ObjectIdentifier(root.storage).hashValue)
   }
 }
 
 // MARK: Mutating Operations
 extension _BTree {
+  /// Invalidates the issued indices of the dictionary. Ensure this is
+  /// called for operations which mutate the SortedDictionary.
+  @inlinable
+  @inline(__always)
+  internal mutating func invalidateIndices() {
+    self.age &+= 1
+  }
+  
   @usableFromInline
   internal enum InsertionResult {
     case updated(previousValue: Value)
@@ -101,53 +134,6 @@ extension _BTree {
     }
   }
   
-  @usableFromInline
-  internal enum KeyPosition {
-    case start
-    case end
-    
-    @usableFromInline
-    func insertionIndex(for key: Key, in handle: Node.UnsafeHandle) -> Int {
-      switch self {
-      case .start:
-        return handle.firstIndex(of: key)
-      case .end:
-        return handle.lastIndex(of: key)
-      }
-    }
-  }
-  
-  // TODO: potentially remove
-  /// Runs a function on a given key and bubbles the result back up
-  @inlinable
-  @inline(__always)
-  internal mutating func updateKey<R>(
-    _ key: Key,
-    at position: KeyPosition,
-    bubble: (R, Node.UnsafeHandle) -> R,
-    operation: (Node.UnsafeHandle, Int) -> R
-  ) -> R {
-    func processLayer(_ handle: Node.UnsafeHandle) -> R {
-      let insertionIndex = position.insertionIndex(for: key, in: handle)
-      
-      // See if we found the element early
-      // TODO: this does not properly handle duplicates
-      if _slowPath(insertionIndex > 0 &&
-          handle[keyAt: insertionIndex - 1] == key) {
-        return operation(handle, insertionIndex - 1)
-      }
-      
-      if handle.isLeaf {
-        return operation(handle, insertionIndex)
-      } else {
-        let childResult = handle[childAt: insertionIndex].update({ processLayer($0) })
-        return bubble(childResult, handle)
-      }
-    }
-    
-    return self.root.update { processLayer($0) }
-  }
-  
   /// Inserts an element into the BTree, or updates it if it already exists within the tree. If there are
   /// multiple instances of the key in the tree, this updates the last one.
   ///
@@ -158,6 +144,8 @@ extension _BTree {
   @inlinable
   @discardableResult
   internal mutating func insertOrUpdate(_ element: Element) -> Value? {
+    invalidateIndices()
+    
     // TODO: this is not needed for BTrees without duplicates
     // Potentially add a flag to not perform unneeded descents.
     func findLast(within handle: Node.UnsafeHandle, at index: Int) -> Value? {
@@ -166,7 +154,7 @@ extension _BTree {
         
         if !handle.isLeaf {
           let previousValue: Value? = handle[childAt: updateIndex].update { handle in
-            let index = handle.lastIndex(of: element.key)
+            let index = handle.lastSlot(for: element.key)
             return findLast(within: handle, at: index)
           }
           
@@ -184,7 +172,7 @@ extension _BTree {
     }
     
     func insertInto(node handle: Node.UnsafeHandle) -> InsertionResult {
-      let insertionIndex = handle.lastIndex(of: element.key)
+      let insertionIndex = handle.lastSlot(for: element.key)
       
       if let previousValue = findLast(within: handle, at: insertionIndex) {
         return .updated(previousValue: previousValue)
@@ -224,82 +212,60 @@ extension _BTree {
     
     return nil
   }
+  
+  /// Removes the key-value pair corresponding to the first found instance of the key.
+  /// This may not be the first instance of the key. This is marginally more efficient for trees
+  /// that do not have duplicates.
+  ///
+  /// If the key is not found, the tree is not modified, although the age of the tree may change.
+  ///
+  /// - Parameter key: The key to remove in the tree
+  /// - Returns: The key-value pair which was removed. `nil` if not removed.
+  @inlinable
+  @discardableResult
+  internal mutating func removeAny(key: Key) -> Element? {
+    invalidateIndices()
+    
+    return nil
+  }
 }
 
 // MARK: Read Operations
-extension _BTree {
-  /// Returns a path to the key at absolute offset `i`.
-  /// - Parameter offset: 0-indexed offset within BTree bounds, else may panic.
-  /// - Returns: the index of the appropriate element.
+extension _BTree {  
+  /// Returns the value corresponding to the first found instance of the key. This may
+  /// not be the first instance of the key. This is marginally more efficient for trees
+  /// that do not have duplicates.
+  ///
+  /// - Parameter key: The key to search for
+  /// - Returns: `nil` if the key was not found. Otherwise, the previous value.
   /// - Complexity: O(`log n`)
   @inlinable
-  internal func indexToElement(at offset: Int) -> Index {
-    assert(offset <= self.count, "Index out of bounds.")
-    
-    if offset == self.count {
-      return Index(nil)
-    }
-    
-    var offsets = [Int]()
-    offsets.reserveCapacity(BTREE_MAX_DEPTH)
-    
-    var node: _Node = self.root
-    var startIndex = 0
-    
-    while !node.read({ $0.isLeaf }) {
-      let internalPath: UnsafePath? = node.read { handle in
-        for childSlot in 0..<handle.numChildren {
-          let child = handle[childAt: childSlot]
-          let endIndex = startIndex + child.read({ $0.numTotalElements })
-          
-          if offset < endIndex {
-            offsets.append(childSlot)
-            node = child
-            return nil
-          } else if offset == endIndex {
-            // We've found the node we want
-            return UnsafePath(node: node, slot: childSlot, offsets: offsets, index: offset)
-          } else {
-            startIndex = endIndex + 1
-          }
-        }
-        
-        // TODO: convert into debug-only preconditionFaliure
-        preconditionFailure("In-bounds index not found within tree.")
-      }
-      
-      if let internalPath = internalPath { return Index(internalPath) }
-    }
-    
-    return Index(UnsafePath(node: node, slot: offset - startIndex, offsets: offsets, index: offset))
-  }
-  
-  /// Returns the value corresponding to the first instance of the key
-  /// - Complexity: O(`log n`)
-  @inlinable
-  internal func firstValue(for key: Key) -> Value? {
-    // TODO: check if switching to unowned storage removes
+  internal func anyValue(for key: Key) -> Value? {
     // the retain/release calls
     // Retain
-    var node: Node? = self.root
+    var node: Unmanaged<Node.Storage>? = .passUnretained(self.root.storage)
     
-    while let currentNode = node {
-      let value: Value? = currentNode.read { handle in
-        let index = handle.firstIndex(of: key)
-        
-        if index < handle.numElements && handle[keyAt: index] == key {
-          return handle[valueAt: index]
-        } else {
-          if handle.isLeaf {
-            node = nil
+    while node != nil {
+      // Retain(node)
+      let value: Value? = node.unsafelyUnwrapped._withUnsafeGuaranteedRef { storage in
+        unsafeBitCast(storage, to: Node.self).read { handle in
+          let slot = handle.firstSlot(for: key)
+          
+          if slot < handle.numElements && handle[keyAt: slot] == key {
+            return handle[valueAt: slot]
           } else {
-            // Release
-            // Retain
-            node = handle[childAt: index]
+            if handle.isLeaf {
+              // Release(node)
+              node = nil
+            } else {
+              // Release(node)
+              let nextNode: Unmanaged<Node.Storage> = .passUnretained(handle[childAt: slot].storage)
+              node = nextNode
+            }
           }
+          
+          return nil
         }
-        
-        return nil
       }
       
       if let value = value { return value }
@@ -307,37 +273,4 @@ extension _BTree {
     
     return nil
   }
-  
-  /// Returns a path to the first key that is equal to given key.
-  /// - Returns: If found, returns a cursor to the element.
-  @inlinable
-  internal func findFirstKey(_ key: Key) -> UnsafePath? {
-    var offsets = [Int]()
-    var node: Node? = self.root
-    
-    while let currentNode = node {
-      let path: UnsafePath? = currentNode.read { handle in
-        let keyIndex = handle.firstIndex(of: key)
-        if keyIndex < handle.numElements && handle[keyAt: keyIndex] == key {
-          return UnsafePath(node: currentNode.storage, slot: keyIndex, offsets: offsets, index: 0)
-        } else {
-          if handle.isLeaf {
-            node = nil
-          } else {
-            offsets.append(keyIndex)
-            node = handle[childAt: keyIndex]
-          }
-          
-          return nil
-        }
-      }
-      
-      if let path = path {
-        return path
-      }
-    }
-    
-    return nil
-  }
-
 }

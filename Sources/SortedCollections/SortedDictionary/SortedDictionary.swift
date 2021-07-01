@@ -25,12 +25,6 @@ public struct SortedDictionary<Key: Comparable, Value> {
   @usableFromInline
   internal var _root: _Tree
   
-  /// A metric to uniquely identify a sorted dictionary's state. It is not
-  /// impossible for two dictionaries to have the same age by pure
-  /// coincidence.
-  @usableFromInline
-  internal var _age: Int32
-  
   /// Creates an empty dictionary.
   /// 
   /// - Complexity: O(1)
@@ -38,14 +32,12 @@ public struct SortedDictionary<Key: Comparable, Value> {
   @inline(__always)
   public init() {
     self._root = _Tree()
-    self._age = Int32(truncatingIfNeeded: ObjectIdentifier(self._root.root.storage).hashValue)
   }
   
   /// Creates a dictionary rooted at a given BTree.
   @inlinable
   internal init(_rootedAt tree: _Tree) {
     self._root = tree
-    self._age = Int32(truncatingIfNeeded: ObjectIdentifier(self._root.root.storage).hashValue)
   }
   
   /// Creates a dictionary from a sequence of key-value pairs which must
@@ -61,14 +53,6 @@ public struct SortedDictionary<Key: Comparable, Value> {
     for (key, value) in keysAndValues {
       self._root.insertOrUpdate((key, value))
     }
-  }
-  
-  /// Invalidates the issued indices of the dictionary. Ensure this is
-  /// called for operations which mutate the SortedDictionary.
-  @inlinable
-  @inline(__always)
-  internal mutating func _invalidateIndices() {
-    self._age &+= 1
   }
 }
 
@@ -92,7 +76,6 @@ extension SortedDictionary {
   @inlinable
   @discardableResult
   public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    self._invalidateIndices()
     return self._root.insertOrUpdate((key: key, value: value))
   }
 }
@@ -115,16 +98,17 @@ extension SortedDictionary {
   @inline(__always)
   public subscript(key: Key) -> Value? {
     get {
-      return self._root.firstValue(for: key)
+      return self._root.anyValue(for: key)
     }
     
+    // TODO: implement _modify
+    
     mutating set {
-      self._invalidateIndices()
-      
       if let newValue = newValue {
         self._root.insertOrUpdate((key, newValue))
       } else {
         // TODO: Removal
+        self._root.removeAny(key: key)
       }
     }
   }

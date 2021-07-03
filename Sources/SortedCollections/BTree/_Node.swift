@@ -85,6 +85,7 @@ extension _Node {
   /// Allows **read-only** access to the underlying data behind the node.
   ///
   /// - Parameter body: A closure with a handle which allows interacting with the node
+  /// - Returns: The value the closure body returns, if any.
   @inlinable
   @inline(__always)
   internal func read<R>(_ body: (UnsafeHandle) throws -> R) rethrows -> R {
@@ -118,7 +119,7 @@ extension _Node {
   /// Allows mutable access to the underlying data behind the node.
   ///
   /// - Parameter body: A closure with a handle which allows interacting with the node
-  /// - Returns: The closure's return value, if exists
+  /// - Returns: The value the closure body returns, if any.
   @inlinable
   @inline(__always)
   internal mutating func update<R>(_ body: (UnsafeHandle) throws -> R) rethrows -> R {

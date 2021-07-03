@@ -82,24 +82,6 @@ extension SortedDictionary: BidirectionalCollection {
   }
   
   @inlinable
-  public func formIndex(_ i: inout Index, offsetBy distance: Int, limitedBy limit: Index) -> Bool {
-    i._index.ensureValid(for: self._root)
-    limit._index.ensureValid(for: self._root)
-    return self._root.formIndex(&i._index, offsetBy: distance, limitedBy: limit._index)
-  }
-  
-  @inlinable
-  public func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
-    i._index.ensureValid(for: self._root)
-    limit._index.ensureValid(for: self._root)
-    if let index = self._root.index(i._index, offsetBy: distance, limitedBy: limit._index) {
-      return Index(index)
-    } else {
-      return nil
-    }
-  }
-  
-  @inlinable
   public subscript(position: Index) -> Element {
     position._index.ensureValid(for: self._root)
     return self._root[position._index]

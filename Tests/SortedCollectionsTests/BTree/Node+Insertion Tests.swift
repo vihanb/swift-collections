@@ -19,7 +19,7 @@ func expectInsertionInTree(
   toEqual refTree: NodeTemplate) {
   var btree = tree.toBTree(ofCapacity: capacity)
   
-  btree.insertOrUpdate((key: key, value: key * 2))
+  btree.setAnyValue(key * 2, forKey: key)
   
   let refMatches = refTree.matches(btree)
   if !refMatches {

@@ -135,7 +135,10 @@ extension _BTree {
   }
   
   /// Inserts an element into the BTree, or updates it if it already exists within the tree. If there are
-  /// multiple instances of the key in the tree, this updates the last one.
+  /// multiple instances of the key in the tree, this may update any one.
+  ///
+  /// This operation is marginally more efficient on trees without duplicates, and may have
+  /// inconsistent results on trees with duplicates.
   ///
   /// - Parameters:
   ///   - element: The key-value pair to insert
@@ -143,70 +146,18 @@ extension _BTree {
   /// - Complexity: O(`log n`)
   @inlinable
   @discardableResult
-  internal mutating func insertOrUpdate(_ element: Element) -> Value? {
+  internal mutating func setAnyValue(_ value: Value, forKey key: Key) -> Value? {
     invalidateIndices()
     
-    // TODO: this is not needed for BTrees without duplicates
-    // Potentially add a flag to not perform unneeded descents.
-    func findLast(within handle: Node.UnsafeHandle, at index: Int) -> Value? {
-      if _slowPath(index > 0 && handle[keyAt: index - 1] == element.key) {
-        let updateIndex = index - 1
-        
-        if !handle.isLeaf {
-          let previousValue: Value? = handle[childAt: updateIndex].update { handle in
-            let index = handle.lastSlot(for: element.key)
-            return findLast(within: handle, at: index)
-          }
-          
-          if let previousValue = previousValue {
-            return previousValue
-          }
-        }
-        
-        let previousValue = handle.values.advanced(by: updateIndex).move()
-        handle.values.advanced(by: updateIndex).initialize(to: element.value)
-        return previousValue
-      } else {
-        return nil
-      }
-    }
-    
-    func insertInto(node handle: Node.UnsafeHandle) -> InsertionResult {
-      let insertionIndex = handle.lastSlot(for: element.key)
-      
-      if let previousValue = findLast(within: handle, at: insertionIndex) {
-        return .updated(previousValue: previousValue)
-      }
-      
-      // We need to try to insert as deep as possible as first, and have the splinter
-      // bubble up.
-      if handle.isLeaf {
-        let maybeSplinter = handle.immediatelyInsert(element: element, withRightChild: nil, at: insertionIndex)
-        return InsertionResult(from: maybeSplinter)
-      } else {
-        let result = handle[childAt: insertionIndex].update({ handle in
-          insertInto(node: handle)
-        })
-        
-        switch result {
-        case .updated:
-          return result
-        case .splintered(let splinter):
-          let maybeSplinter = handle.immediatelyInsert(splinter: splinter, at: insertionIndex)
-          return InsertionResult(from: maybeSplinter)
-        case .inserted:
-          handle.numTotalElements += 1
-          return .inserted
-        }
-      }
-    }
-    
-    let result = self.root.update { insertInto(node: $0) }
+    let result = self.root.update { $0.setAnyValue(value, forKey: key) }
     switch result {
     case let .updated(previousValue):
       return previousValue
     case let .splintered(splinter):
-      self.root = splinter.toNode(from: self.root, withCapacity: self.internalCapacity)
+      self.root = splinter.toNode(
+        from: self.root,
+        withCapacity: self.internalCapacity
+      )
     default: break
     }
     
@@ -226,7 +177,35 @@ extension _BTree {
   internal mutating func removeAny(key: Key) -> Element? {
     invalidateIndices()
     
-    return nil
+    func deleteWithin(node handle: Node.UnsafeHandle) -> Element? {
+      let slot = handle.firstSlot(for: key)
+      
+      if slot < handle.numElements && handle[keyAt: slot] == key {
+        // We have found the key
+        if handle.isLeaf {
+          // TODO: fix deficiencies
+          return handle.removeElement(at: slot)
+        } else {
+          return nil
+        }
+      } else {
+        if handle.isLeaf {
+          // If we're in a leaf node and didn't find the key, it does
+          // not exist.
+          return nil
+        } else {
+          // Sanity-check
+          assert(slot < handle.numChildren, "Attempt to remove from invalid child.")
+          
+          return handle[childAt: slot].update { deleteWithin(node: $0) }
+        }
+      }
+      
+      return nil
+    }
+    
+    // TODO: Don't create CoW copy until needed.
+    return self.root.update { deleteWithin(node: $0) }
   }
 }
 
@@ -243,29 +222,25 @@ extension _BTree {
   internal func anyValue(for key: Key) -> Value? {
     // the retain/release calls
     // Retain
-    var node: Unmanaged<Node.Storage>? = .passUnretained(self.root.storage)
+    var node: Node? = self.root
     
-    while node != nil {
-      // Retain(node)
-      let value: Value? = node.unsafelyUnwrapped._withUnsafeGuaranteedRef { storage in
-        unsafeBitCast(storage, to: Node.self).read { handle in
-          let slot = handle.firstSlot(for: key)
-          
-          if slot < handle.numElements && handle[keyAt: slot] == key {
-            return handle[valueAt: slot]
+    while let currentNode = node {
+      let value: Value? = currentNode.read { handle in
+        let slot = handle.firstSlot(for: key)
+        
+        if slot < handle.numElements && handle[keyAt: slot] == key {
+          return handle[valueAt: slot]
+        } else {
+          if handle.isLeaf {
+            node = nil
           } else {
-            if handle.isLeaf {
-              // Release(node)
-              node = nil
-            } else {
-              // Release(node)
-              let nextNode: Unmanaged<Node.Storage> = .passUnretained(handle[childAt: slot].storage)
-              node = nextNode
-            }
+            // Release
+            // Retain
+            node = handle[childAt: slot]
           }
-          
-          return nil
         }
+        
+        return nil
       }
       
       if let value = value { return value }

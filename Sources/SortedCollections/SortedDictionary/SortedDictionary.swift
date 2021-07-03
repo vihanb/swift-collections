@@ -51,7 +51,7 @@ public struct SortedDictionary<Key: Comparable, Value> {
     self.init()
     
     for (key, value) in keysAndValues {
-      self._root.insertOrUpdate((key, value))
+      self._root.setAnyValue(value, forKey: key)
     }
   }
 }
@@ -76,7 +76,7 @@ extension SortedDictionary {
   @inlinable
   @discardableResult
   public mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    return self._root.insertOrUpdate((key: key, value: value))
+    return self._root.setAnyValue(value, forKey: key)
   }
 }
 
@@ -105,7 +105,7 @@ extension SortedDictionary {
     
     mutating set {
       if let newValue = newValue {
-        self._root.insertOrUpdate((key, newValue))
+        self._root.setAnyValue(newValue, forKey: key)
       } else {
         // TODO: Removal
         self._root.removeAny(key: key)

@@ -78,7 +78,7 @@ extension _Node {
         }
       }
       
-      if !isLeaf && false {
+      if !isLeaf {
         for i in 0..<numElements {
           let key = self[keyAt: i]
           let child = self[childAt: i].read({ $0[keyAt: $0.numElements - 1] })
@@ -88,6 +88,12 @@ extension _Node {
         let key = self[keyAt: numElements - 1]
         let child = self[childAt: numElements].read({ $0[keyAt: $0.numElements - 1] })
         precondition(child >= key, "Right subtree must be greater than or equal to than its parent key.")
+        
+        // Ensure if one child is a leaf, then all children are leaves
+        let nextLevelIsLeaf = self[childAt: 0].read({ $0.isLeaf })
+        for i in 0..<numChildren {
+          precondition(self[childAt: i].read({ $0.isLeaf }) == nextLevelIsLeaf, "All children must be the same depth.")
+        }
       }
     }
     #else
@@ -145,6 +151,13 @@ extension _Node {
     @inlinable
     @inline(__always)
     internal var isLeaf: Bool { children == nil }
+    
+    /// A lower bound on the amount of keys we would want a node to contain.
+    ///
+    /// Defined as `ceil(capacity)/2 - 1`.
+    @inlinable
+    @inline(__always)
+    internal var minCapacity: Int { (capacity + 1) / 2 - 1 }
   }
 }
 
@@ -248,6 +261,7 @@ extension _Node.UnsafeHandle {
   /// Searches the node and its children for a given value
   @inlinable
   internal func findValue(for key: Key) -> Value? {
+    // TODO: get rid of this method (suboptimal implementation).
     let slot = self.firstSlot(for: key)
     
     if slot < self.numElements && self[keyAt: slot] == key {
@@ -427,6 +441,15 @@ extension _Node.UnsafeHandle {
     self.numTotalElements -= 1
     
     return element
+  }
+  
+  // TODO: see if this optimizes neatly to getrid of memmove
+  /// Removes the last key-value pair from the node. This is assumed to run on a
+  /// non-empty leaf.
+  @inlinable
+  @inline(__always)
+  internal func popElement() -> _Node.Element {
+    return self.removeElement(at: self.numElements - 1)
   }
 }
 

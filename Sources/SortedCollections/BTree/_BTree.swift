@@ -180,26 +180,38 @@ extension _BTree {
     func deleteWithin(node handle: Node.UnsafeHandle) -> Element? {
       let slot = handle.firstSlot(for: key)
       
-      if slot < handle.numElements && handle[keyAt: slot] == key {
-        // We have found the key
-        if handle.isLeaf {
-          // TODO: fix deficiencies
-          return handle.removeElement(at: slot)
-        } else {
-          return nil
-        }
-      } else {
-        if handle.isLeaf {
-          // If we're in a leaf node and didn't find the key, it does
-          // not exist.
-          return nil
-        } else {
-          // Sanity-check
-          assert(slot < handle.numChildren, "Attempt to remove from invalid child.")
-          
-          return handle[childAt: slot].update { deleteWithin(node: $0) }
-        }
-      }
+//      if slot < handle.numElements && handle[keyAt: slot] == key {
+//        // We have found the key
+//        if handle.isLeaf {
+//          // Check if removing the element will make the element undersized
+//          if handle.numElements <= handle.minCapacity {
+//            // Undersized node
+//            return handle.
+//          } else {
+//            return handle.removeElement(at: slot)
+//          }
+//        } else {
+//          if handle.numElements <= handle.minCapacity {
+//            // Undersized node.
+//          } else {
+//            // Swap with the
+//          }
+//        }
+//      } else {
+//        if handle.isLeaf {
+//          // If we're in a leaf node and didn't find the key, it does
+//          // not exist.
+//          return nil
+//        } else {
+//          // Sanity-check
+//          assert(slot < handle.numChildren, "Attempt to remove from invalid child.")
+//          assert()
+//          
+//          let childElement = handle[childAt: slot].update { deleteWithin(node: $0) }
+//          
+//          //
+//        }
+//      }
       
       return nil
     }

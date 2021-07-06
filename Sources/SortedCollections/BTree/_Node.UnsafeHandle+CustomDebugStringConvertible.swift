@@ -100,7 +100,25 @@ extension _Node.UnsafeHandle: CustomDebugStringConvertible {
   #else
   /// A textual representation of this instance, suitable for debugging.
   public var debugDescription: String {
-    return self.description
+    var result = "Node<\(Key.self), \(Value.self)>(["
+    var first = true
+    for slot in 0..<self.numElements {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      result += "("
+      debugPrint(self[keyAt: slot], terminator: ", ", to: &result)
+      debugPrint(self[valueAt: slot], terminator: ")", to: &result)
+    }
+    result += "], "
+    if let children = self.children {
+      debugPrint(Array(UnsafeBufferPointer(start: children, count: self.numChildren)), terminator: ")", to: &result)
+    } else {
+      result += "[])"
+    }
+    return result
   }
   #endif // DEBUG
 }

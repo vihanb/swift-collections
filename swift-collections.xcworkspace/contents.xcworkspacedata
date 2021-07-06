@@ -2,12 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:/Users/vihan/Documents/swift-collections/SortedCollections.playground">
-   </FileRef>
-   <FileRef
-      location = "group:../swift-collections-runner/swift-collections-runner.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "group:">
    </FileRef>
 </Workspace>

@@ -94,6 +94,7 @@ let package = Package(
       dependencies: [
         .product(name: "CollectionsBenchmark", package: "swift-collections-benchmark"),
         "CppBenchmarks",
+        "RustBenchmarks",
         "Collections",
       ],
       path: "Benchmarks/Benchmarks",
@@ -104,6 +105,10 @@ let package = Package(
     .target(
       name: "CppBenchmarks",
       path: "Benchmarks/CppBenchmarks"
+    ),
+    .systemLibrary(
+      name: "RustBenchmarks",
+      path: "Benchmarks/RustBenchmarks"
     ),
     .target(
       name: "swift-collections-benchmark",

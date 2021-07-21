@@ -79,6 +79,7 @@ extension _BTree {
     ///   - index: The absolute offset of this path's element in the tree.
     @inlinable
     internal init(
+      // TODO: look into Node.Storage vs Unmanaged<Node.Storage>
       node: Node.Storage,
       slot: Int,
       childSlots: Offsets,
@@ -128,6 +129,7 @@ extension _BTree.UnsafePath: Comparable {
   /// - Complexity: O(`log n`)
   @inlinable
   public static func <(lhs: _BTree.UnsafePath, rhs: _BTree.UnsafePath) -> Bool {
+    // TODO: change to use .offset
     for i in 0..<min(lhs.childSlots.depth, rhs.childSlots.depth) {
       if lhs.childSlots[i] < rhs.childSlots[i] {
         return true

@@ -34,6 +34,7 @@ extension _Node {
     @usableFromInline
     internal var count: Int
     
+    // TODO: consider using a cumulative count
     /// The total amount of elements contained underneath this node
     @usableFromInline
     internal var subtreeCount: Int

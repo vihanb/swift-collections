@@ -57,11 +57,10 @@ extension SortedDictionary {
   @inlinable
   @inline(__always)
   public var values: Values {
-    // TODO: consider implementing a _read accessor.
     get {
       Values(_base: self)
     }
-    
+
     _modify {
       // TODO: avoid allocating a new node
       var values = Values(_base: SortedDictionary())

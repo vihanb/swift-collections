@@ -70,6 +70,7 @@ extension SortedDictionary {
     by keyForValue: (S.Element) throws -> Key
   ) rethrows where Value == [S.Element], S : Sequence {
     self.init()
+    
     // TODO: implement some way to take advantage of S.underestimateCapacity
     for value in values {
       let key = try keyForValue(value)

@@ -23,6 +23,7 @@ extension SortedDictionary: Equatable where Value: Equatable {
   /// - Complexity: O(`n`)
   @inlinable
   public static func ==(lhs: SortedDictionary<Key, Value>, rhs: SortedDictionary<Key, Value>) -> Bool {
+    // TODO: optimize/benchmarking by comparing node identity.
     if lhs.count != rhs.count { return false }
     for ((k1, v1), (k2, v2)) in zip(lhs, rhs) {
       if k1 != k2 || v1 != v2 {

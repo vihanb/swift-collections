@@ -45,7 +45,7 @@ extension _BTree: Sequence {
       // TODO: maybe convert to unowned(unsafe)
       var node = tree.root
       while !node.read({ $0.isLeaf }) {
-        self.parents.append(Unmanaged.passUnretained(node.storage))
+        self.parents.append(.passUnretained(node.storage))
         self.offsets.append(0)
         
         node = node.read({ $0[childAt: 0] })

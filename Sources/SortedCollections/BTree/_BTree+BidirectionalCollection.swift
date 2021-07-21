@@ -21,8 +21,9 @@ extension _BTree: BidirectionalCollection {
   @inline(__always)
   internal var isEmpty: Bool { self.count == 0 }
   
+  // TODO: further look into O(1) implementation.
   /// Locates the first element and returns a proper path to it, or nil if the BTree is empty.
-  /// - Complexity: O(1)
+  /// - Complexity: O(log n)
   @inlinable
   internal var startIndex: Index {
     if count == 0 { return Index(nil, forTree: self) }
@@ -49,8 +50,7 @@ extension _BTree: BidirectionalCollection {
   @inlinable
   internal var endIndex: Index { Index(nil, forTree: self) }
   
-  /// Gets the effective offset of an index
-  /// - Warning: this does not
+  /// Gets the integer-offset of an index in the tree.
   @inlinable
   @inline(__always)
   internal func offset(of index: Index) -> Int {
@@ -174,58 +174,11 @@ extension _BTree: BidirectionalCollection {
     return newIndex
   }
   
-  /// Offsets the given index by the specified distance, or so that it equals the given limiting index.
-  ///
-  /// - Parameters:
-  ///   - i: A valid index of the collection.
-  ///   - distance: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`, a limit that is
-  ///       less than `i` has no effect. Likewise, if `distance < 0`, a limit that is greater than `i`
-  ///       has no effect.
-  /// - Returns: `true` if `i` has been offset by exactly `distance` steps without going beyond
-  ///     `limit`; otherwise, `false`. When the return value is `false`, the value of `i` is equal
-  ///     to `limit`.
-  /// - Complexity: O(`log n`) in the worst-case.
-  @inlinable
-  internal func formIndex(_ i: inout Index, offsetBy distance: Int, limitedBy limit: Index) -> Bool {
-    let distanceToLimit = self.distance(from: i, to: limit)
-    if distance < 0 ? distanceToLimit > distance : distanceToLimit < distance {
-      self.formIndex(&i, offsetBy: distanceToLimit)
-      return false
-    } else {
-      self.formIndex(&i, offsetBy: distance)
-      return true
-    }
-  }
-  
-  /// Returns an index that is the specified distance from the given index, unless that distance
-  /// is beyond a given limiting index.
-  ///
-  /// - Parameters:
-  ///   - i: A valid index of the collection.
-  ///   - distance: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`, a `limit`
-  ///       that is less than `i` has no effect. Likewise, if `distance < 0`, a `limit` that is
-  ///       greater twhan `i` has no effect.
-  /// - Returns: An index offset by `distance` from the index `i`, unless that index would
-  ///     be beyond `limit` in the direction of movement. In that case, the method returns `nil`.
-  @inlinable
-  internal func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
-    let distanceToLimit = self.distance(from: i, to: limit)
-    if distance < 0 ? distanceToLimit > distance : distanceToLimit < distance {
-      return nil
-    } else {
-      var newIndex = i
-      self.formIndex(&newIndex, offsetBy: distance)
-      return newIndex
-    }
-  }
-  
   @inlinable
   @inline(__always)
   internal subscript(index: Index) -> Element {
     assert(index.path != nil, "Attempt to subscript out of range index.")
-    return index.path!.element
+    return index.path.unsafelyUnwrapped.element
   }
 }
 
@@ -238,6 +191,7 @@ extension _BTree {
   /// - Parameter key: The key to search for within the tree.
   /// - Returns: If found, returns a path to the element. Otherwise, `nil`.
   @inlinable
+  // TODO: anyIndex -> findAnyIndex
   internal func anyIndex(forKey key: Key) -> Index? {
     var childSlots = UnsafePath.Offsets(repeating: 0)
     var node: Node? = self.root
@@ -246,6 +200,7 @@ extension _BTree {
       let path: UnsafePath? = currentNode.read { handle in
         let keySlot = handle.startSlot(forKey: key)
         if keySlot < handle.elementCount && handle[keyAt: keySlot] == key {
+          // FIXME: offset should not be zero
           return UnsafePath(node: currentNode.storage, slot: keySlot, childSlots: childSlots, offset: 0)
         } else {
           if handle.isLeaf {

@@ -39,19 +39,6 @@ final class NodeBalancingTests: CollectionTestCase {
         tree { 24; 25 }
       }
     }
-
-    var btree = t.toBTree(ofCapacity: 2)
-    print(btree.debugDescription)
-    btree.removeAnyElement(forKey: 0)
-    btree.removeAnyElement(forKey: 1)
-    btree.removeAnyElement(forKey: 2)
-    btree.removeAnyElement(forKey: 3)
-    btree.removeAnyElement(forKey: 4)
-    btree.removeAnyElement(forKey: 5)
-    btree.removeAnyElement(forKey: 6)
-    btree.removeAnyElement(forKey: 18)
-    print(btree.debugDescription)
-//    print(SortedDictionary<Int, Int>(_rootedAt: btree))
   }
   
   // MARK: Right Rotation

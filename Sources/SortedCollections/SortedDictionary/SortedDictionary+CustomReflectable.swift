@@ -15,7 +15,6 @@ extension SortedDictionary: CustomReflectable {
   
   /// The custom mirror for this instance.
   public var customMirror: Mirror {
-    // TODO: instead of Array(self), implement a Element view?
-    Mirror(self, unlabeledChildren: Array(self), displayStyle: .dictionary)
+    Mirror(self, unlabeledChildren: self, displayStyle: .dictionary)
   }
 }

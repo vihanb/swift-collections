@@ -28,6 +28,7 @@ extension SortedDictionary: ExpressibleByDictionaryLiteral {
   /// - Complexity: O(`n log n`)
   @inlinable
   public init(dictionaryLiteral elements: (Key, Value)...) {
+    // TODO: use non-unique initializer
     self.init(uniqueKeysWithValues: elements)
   }
 }
